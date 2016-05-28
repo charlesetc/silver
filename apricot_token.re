@@ -1,11 +1,15 @@
 /* apricot token */
 
-type token = Identifier of string
+type token
+  = Identifier of string
   | String_literal of string
+  | Dot_literal of string
+  | String
   | Left_curly
   | Right_curly
   | Left_round
   | Right_round
+  | Dot
   | Newline
   | Colon
   | Space
@@ -16,15 +20,17 @@ let string_of_token tokens => switch tokens {
   | Right_curly => "right curly";
   | Left_round => "left round";
   | Right_round => "right round";
+  | Dot => "dot";
   | Space => "space";
   | Colon => "colon";
   | Identifier s => ":" ^ s;
+  | Dot_literal s => "." ^ s;
   | String_literal s => "\"" ^ s ^ "\""
   | Newline => "newline"
 };
 
 let is_split_char c => {
-  let split_chars = ";\"\n'{}(). ";
+  let split_chars = ":;\"\n'{}(). ";
   switch (String.index split_chars c) {
     | exception Not_found => false;
     | _ => true;
@@ -77,9 +83,9 @@ let token stream => {
 
   let rec read_identifier => {
     switch (Stream.peek stream) {
+      | None => "";
       | Some c when is_split_char c => "" ;
       | Some c => { advance_character () ; string_of_char c ^ read_identifier () };
-      | None => "";
     }
   };
 
@@ -95,6 +101,14 @@ let token stream => {
       | Some '\n' => gen_token Newline;
       | Some ';' => gen_token Newline;
       | Some ' ' => gen_token Space;
+      | Some '.' => {
+        advance_character ();
+        Some (switch (Stream.peek stream) {
+          | None => Dot;
+          | Some c when is_split_char c => Dot;
+          | Some c => Dot_literal (read_identifier ());
+        })
+      }
       | Some '"' => {
         advance_character ();
         let char = String_literal (read_string '"');

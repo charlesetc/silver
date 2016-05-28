@@ -52,6 +52,23 @@ let test_tokens => {
     Apricot_token.Identifier "there",
   ];
 
+  assert_tokens "hi." [
+    Apricot_token.Identifier "hi",
+    Apricot_token.Dot,
+  ];
+
+  assert_tokens "hi.;" [
+    Apricot_token.Identifier "hi",
+    Apricot_token.Dot,
+    Apricot_token.Newline,
+  ];
+
+  assert_tokens "hi.there" [
+    Apricot_token.Identifier "hi",
+    Apricot_token.Dot_literal "there",
+  ];
+
+
   assert_tokens "'one' \"two\";:" [
     Apricot_token.String_literal "one",
     Apricot_token.Space,
