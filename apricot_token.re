@@ -1,14 +1,15 @@
 /* apricot token */
 
 type token = Identifier of string
-           | String_literal of string
-           | Left_curly
-           | Right_curly
-           | Left_round
-           | Right_round
-           | Newline
-           | Space
-           ;
+  | String_literal of string
+  | Left_curly
+  | Right_curly
+  | Left_round
+  | Right_round
+  | Newline
+  | Colon
+  | Space
+  ;
 
 let string_of_token tokens => switch tokens {
   | Left_curly => "left curly";
@@ -16,6 +17,7 @@ let string_of_token tokens => switch tokens {
   | Left_round => "left round";
   | Right_round => "right round";
   | Space => "space";
+  | Colon => "colon";
   | Identifier s => ":" ^ s;
   | String_literal s => "\"" ^ s ^ "\""
   | Newline => "newline"
@@ -49,7 +51,7 @@ let next_character_generator position stream () => {
       column: (!position).column + 1,
     };
   };
-  char
+  ()
 };
 
 let string_of_char = String.make 1;
@@ -61,14 +63,14 @@ let token stream => {
     column: 0,
   };
 
-  let next_character = next_character_generator position stream;
+  let advance_character = next_character_generator position stream;
 
   let token_error desc => raise (Token_error desc !position);
 
   let rec read_string quote => {
     switch (Stream.peek stream) {
-      | Some c when c == quote => "" ;
-      | Some c => { ignore (next_character ()) ; string_of_char c ^ read_string quote };
+      | Some c when c == quote => { "" } ;
+      | Some c => { advance_character () ; string_of_char c ^ read_string quote };
       | None => token_error "hit end of file when parsing string";
     }
   };
@@ -76,24 +78,35 @@ let token stream => {
   let rec read_identifier => {
     switch (Stream.peek stream) {
       | Some c when is_split_char c => "" ;
-      | Some c => { ignore (next_character ()) ; string_of_char c ^ read_identifier () };
+      | Some c => { advance_character () ; string_of_char c ^ read_identifier () };
       | None => "";
     }
   };
 
-  let gen_token tok => Some { ignore (next_character ()) ; tok };
+  let gen_token tok => Some { advance_character () ; tok };
 
   let stream_fn _ => {
     let character = switch (Stream.peek stream) {
       | Some '}' => gen_token Right_curly;
       | Some '{' => gen_token Left_curly;
+      | Some ':' => gen_token Colon;
       | Some ')' => gen_token Right_round;
       | Some '(' => gen_token Left_round;
       | Some '\n' => gen_token Newline;
       | Some ';' => gen_token Newline;
       | Some ' ' => gen_token Space;
-      | Some '"' => gen_token (String_literal (read_string '"'));
-      | Some '\'' => gen_token (String_literal (read_string '\''));
+      | Some '"' => {
+        advance_character ();
+        let char = String_literal (read_string '"');
+        advance_character ();
+        Some char
+      }
+      | Some '\'' => {
+        advance_character ();
+        let char = String_literal (read_string '\'');
+        advance_character ();
+        Some char
+      }
       | Some _ => Some (Identifier (read_identifier ()));
       | None => None;
     };
