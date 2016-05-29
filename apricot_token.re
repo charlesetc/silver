@@ -1,5 +1,7 @@
 /* apricot token */
 
+open Apricot_utils;
+
 type token
   = Identifier of string
   | String_literal of string
@@ -37,13 +39,6 @@ let is_split_char c => {
   }
 };
 
-type position = {
-  line: int,
-  column: int,
-};
-
-exception Token_error of string position;
-
 let next_character_generator position stream () => {
   let char = Stream.next stream;
   if (char == '\n') {
@@ -66,18 +61,28 @@ let token stream => {
 
   let position = ref {
     line: 0,
-    column: 0,
+    column: -1,
   };
 
   let advance_character = next_character_generator position stream;
 
-  let token_error desc => raise (Token_error desc !position);
+  let error_with_position desc => raise (Apricot_utils.Apricot_error desc !position);
 
   let rec read_string quote => {
+    let starting_position = !position;
     switch (Stream.peek stream) {
       | Some c when c == quote => { "" } ;
-      | Some c => { advance_character () ; string_of_char c ^ read_string quote };
-      | None => token_error "hit end of file when parsing string";
+      | Some c => {
+        advance_character ();
+        switch (string_of_char c ^ read_string quote) {
+          | s => s;
+          /* This catches exceptions and rethrows them with the proper position */
+          | exception Apricot_utils.Apricot_error desc pos => {
+            raise (Apricot_utils.Apricot_error desc starting_position)
+          }
+        }
+      }
+      | None => error_with_position "hit end of file when parsing string";
     }
   };
 

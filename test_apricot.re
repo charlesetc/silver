@@ -1,6 +1,8 @@
 /* test apricot */
 
 open Apricot_token;
+open Apricot_utils;
+open Apricot_balance;
 
 let list_of_stream stream => {
   let acc = ref [];
@@ -10,11 +12,15 @@ let list_of_stream stream => {
   List.rev !acc
 };
 
+exception Generic_assertion of string;
+
 exception Token_assertion of (list Apricot_token.token) (list Apricot_token.token);
+
+let print_success => print_string "\027[32m.\x1B[0m";
 
 let token_equal a b => {
   switch (assert (a == b)) {
-    | _ => print_string "\027[32m.\x1B[0m";
+    | _ => print_success ();
     | exception (Assert_failure _) => raise (Token_assertion a b);
   }
 };
@@ -78,11 +84,49 @@ let test_tokens => {
   ];
 };
 
+let test_balanced => {
+
+  let assert_balanced string => {
+    let state = Stream.of_string string;
+    let state = Apricot_token.token state;
+    let state = Apricot_balance.balance state;
+
+    /* Strictly evaluate the stream */
+    let state = Stream.iter (fun s => ()) state;
+    print_success ();
+  };
+
+  let assert_not_balanced string => {
+    let state = Stream.of_string string;
+    let state = Apricot_token.token state;
+    let state = Apricot_balance.balance state;
+
+    /* Strictly evaluate the stream */
+    switch (Stream.iter (fun s => ()) state) {
+      | _ => raise (Generic_assertion "tokens are balanced");
+      | exception (Apricot_error _ _) => print_success ();
+    }
+  };
+
+  assert_balanced "{}";
+  assert_balanced "{ }";
+  assert_balanced "{ ()}";
+  assert_balanced "({})";
+  assert_balanced "(){}";
+
+  assert_not_balanced "{ ";
+  assert_not_balanced " }";
+  assert_not_balanced "} ";
+  assert_not_balanced "(})";
+  assert_not_balanced "()}";
+};
+
 let run_tests_with_regex regex => {
   let regex = Str.regexp regex;
 
   let tests = [
     ("test tokens", test_tokens),
+    ("test balanced", test_balanced),
   ];
 
   let errors = ref [];
@@ -120,6 +164,10 @@ let run_tests_with_regex regex => {
         print_tokens "found" ts1;
         print_tokens "asserted" ts2;
       };
+      | Apricot_utils.Apricot_error _ _ => {
+        Apricot_utils.print_apricot_error e;
+        print_char '\n';
+      }
       | _ => ();
     };
     print_string ((Printexc.to_string e) ^ "\n");
