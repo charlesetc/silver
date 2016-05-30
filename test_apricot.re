@@ -15,6 +15,7 @@ let list_of_stream stream => {
 exception Generic_assertion of string;
 
 exception Token_assertion of (list Apricot_token.token) (list Apricot_token.token);
+exception String_assertion of string string;
 
 let print_success => print_string "\027[32m.\x1B[0m";
 
@@ -121,12 +122,56 @@ let test_balanced => {
   assert_not_balanced "()}";
 };
 
+let test_basic_parsing => {
+
+  let remove_from_string c s => {
+    let output = ref "";
+    let add_char c => output := !output ^ Apricot_utils.string_of_char c;
+    let s = Stream.of_string s;
+    Stream.iter (fun char => {
+      switch char {
+        | new_char when new_char == c => ();
+        | a => add_char a;
+      }
+    }) s;
+    !output
+  };
+
+  let assert_parsed string expected => {
+    let state = Stream.of_string string;
+    let state = Apricot_token.token state;
+    let state = Apricot_balance.balance state;
+    let state = Apricot_parse.parse state;
+
+    let actual = Apricot_parse.string_of_abstract_tree state;
+
+    let expected = remove_from_string ' ' expected;
+    let actual = remove_from_string ' ' actual;
+
+    switch (assert (actual == expected)) {
+      | _ => print_success ();
+      | exception (Assert_failure _) => raise (String_assertion actual expected);
+    };
+  };
+
+  assert_parsed "" "{}";
+
+  assert_parsed "hi\nthere" "{:hi;:there;}";
+
+  assert_parsed "((this\nthat))" "{(:this :that);}";
+
+  assert_parsed "((((hi))))" "{:hi;}";
+
+  assert_parsed "(square { print 'hi' ; print one })" "{(:square {(:print \"hi\"); (:print :one);});}";
+};
+
 let run_tests_with_regex regex => {
   let regex = Str.regexp regex;
 
   let tests = [
     ("test tokens", test_tokens),
     ("test balanced", test_balanced),
+    ("test basic parsing", test_basic_parsing),
   ];
 
   let errors = ref [];
@@ -153,6 +198,11 @@ let run_tests_with_regex regex => {
 
   List.iter (fun e => {
     switch e {
+      | String_assertion s1 s2 =>
+          Printf.printf
+            "found:    %s\nasserted: %s\n"
+            s1
+            s2;
       | Token_assertion ts1 ts2 => {
         let print_tokens str tokens => {
           Printf.printf "%s: " str;
@@ -164,11 +214,9 @@ let run_tests_with_regex regex => {
         print_tokens "found" ts1;
         print_tokens "asserted" ts2;
       };
-      | Apricot_utils.Apricot_error _ _ => {
+      | _ => {
         Apricot_utils.print_apricot_error e;
-        print_char '\n';
       }
-      | _ => ();
     };
     print_string ((Printexc.to_string e) ^ "\n");
   }) !errors;

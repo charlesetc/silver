@@ -27,8 +27,8 @@ let string_of_token tokens => switch tokens {
   | Colon => "colon";
   | Identifier s => ":" ^ s;
   | Dot_literal s => "." ^ s;
-  | String_literal s => "\"" ^ s ^ "\""
-  | Newline => "newline"
+  | String_literal s => "\"" ^ s ^ "\"";
+  | Newline => "newline";
 };
 
 let is_split_char c => {
@@ -55,8 +55,6 @@ let next_character_generator position stream () => {
   ()
 };
 
-let string_of_char = String.make 1;
-
 let token stream => {
 
   let position = ref {
@@ -74,7 +72,7 @@ let token stream => {
       | Some c when c == quote => { "" } ;
       | Some c => {
         advance_character ();
-        switch (string_of_char c ^ read_string quote) {
+        switch (Apricot_utils.string_of_char c ^ read_string quote) {
           | s => s;
           /* This catches exceptions and rethrows them with the proper position */
           | exception Apricot_utils.Apricot_error desc pos => {
@@ -90,7 +88,7 @@ let token stream => {
     switch (Stream.peek stream) {
       | None => "";
       | Some c when is_split_char c => "" ;
-      | Some c => { advance_character () ; string_of_char c ^ read_identifier () };
+      | Some c => { advance_character () ; Apricot_utils.string_of_char c ^ read_identifier () };
     }
   };
 
