@@ -25,6 +25,8 @@ type abstract_tree 'a
   | Call_list of (list (abstract_tree 'a))
   /* used for sequence => { ... ; ... } */
   | Sequence_list of (list (abstract_tree 'a))
+  /* used for lambdas => { x y : ... ; ... } */
+  | Lambda_list of (list (abstract_tree 'a)) (list (abstract_tree 'a))
   ;
 
 
@@ -60,6 +62,23 @@ let rec string_of_abstract_tree tree => {
           add_string "; ";
         })
         list_of_trees;
+      add_string "} ";
+    }
+    | Lambda_list first_list second_list => {
+      add_string "{lambda ";
+      List.iter
+        (fun x => {
+          add_string (string_of_abstract_tree x);
+          add_string " ";
+        })
+        first_list;
+      add_string "of ";
+      List.iter
+        (fun x => {
+          add_string (string_of_abstract_tree x);
+          add_string "; ";
+        })
+        second_list;
       add_string "} ";
     }
   };
@@ -117,9 +136,13 @@ let parse stream => {
         }
         | Symbol data => add_to outgoing_item (Symbol data);
         | Call_list trees => add_to outgoing_item (Call_list (add_sequences (Stream.of_list trees)));
-        | Sequence_list trees =>
+        | Sequence_list _ =>
           raise (Apricot_utils.Apricot_bug
             "there shouldn't be sequences at this stage"
+            {line: -1, column: -1});
+        | Lambda_list _ _ =>
+          raise (Apricot_utils.Apricot_bug
+            "there shouldn't be lambdas at this stage"
             {line: -1, column: -1});
       }
     }) stream;
@@ -144,6 +167,10 @@ let parse stream => {
         | Symbol data => add_to output (Symbol data);
         | Call_list trees => add_to output (Call_list (remove_spaces trees));
         | Sequence_list trees => add_to output (Sequence_list (remove_spaces trees));
+        | Lambda_list _ _ =>
+          raise (Apricot_utils.Apricot_bug
+            "there shouldn't be lambdas at this stage"
+            {line: -1, column: -1});
       }
     }) trees;
     !output
@@ -179,6 +206,74 @@ let parse stream => {
     }
   };
 
+  let rec add_lambdas tree => {
+
+    let find_colon_index tree => {
+
+      let rec find_index list => {
+        switch (List.hd list) {
+          /* the exception is caught later and
+             interpreted as false */
+          | Symbol (Apricot_token.Colon, _) => 0;
+          | _ => find_index (List.tl list) + 1;
+        }
+      };
+
+      switch tree {
+        | Call_list arguments => {
+          Some (find_index arguments);
+        };
+        | _ => None;
+      }
+    };
+
+    let transform_lambda trees index => {
+      let arguments = switch (List.hd trees) {
+        | Call_list arguments => arguments;
+        | _ => raise (Apricot_bug
+            "arguments to a lambda should always be a call_list"
+            {line: -1, column: -1});
+      };
+      let (first_arguments, second_arguments) = Apricot_utils.split_at index arguments;
+
+      /* get rid of the colon */
+      let second_arguments = List.tl second_arguments;
+      let tail = List.tl trees;
+
+      let second_arguments = switch (List.length second_arguments) {
+        | 0 => tail;
+        | 1 => [List.hd second_arguments, ...tail];
+        | _ => [(Call_list second_arguments), ...tail];
+      };
+
+      Lambda_list first_arguments second_arguments
+    };
+
+    switch tree {
+      | Call_list trees => {
+        let trees = List.map add_lambdas trees;
+        Call_list trees
+      }
+      | Lambda_list first_trees second_trees =>
+          raise (Apricot_utils.Apricot_bug
+            "there shouldn't be lambdas at this stage"
+            {line: -1, column: -1});
+      /* { */
+        /* let second_trees = List.map add_lambdas second_trees; */
+        /* Lambda_list first_trees second_trees */
+      /* } */
+      | Sequence_list trees => {
+        let trees = List.map add_lambdas trees;
+        switch (find_colon_index (List.hd trees)) {
+          | Some index => transform_lambda trees index;
+          | None => Sequence_list trees;
+          | exception (Failure _) => Sequence_list trees;
+        }
+      }
+      | all => all;
+    }
+  };
+
   let state = add_parentheses ();
 
   let state = remove_spaces state;
@@ -189,7 +284,12 @@ let parse stream => {
 
   let state = simplify_single_parentheses state;
 
-  /* let state = reverse_everything state; */
+  let state = add_lambdas state;
+
+  /* incase we added any dumb things... */
+  let state = simplify_single_parentheses state;
+
+  let state = reverse_everything state;
 
   state
 };

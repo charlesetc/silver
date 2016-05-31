@@ -163,6 +163,12 @@ let test_basic_parsing => {
   assert_parsed "((((hi))))" "{:hi;}";
 
   assert_parsed "(square { print 'hi' ; print one })" "{(:square {(:print \"hi\"); (:print :one);});}";
+
+  assert_parsed "{ hi: \n there }" "{{lambda :hi of :there;};}";
+
+  assert_parsed "{ \n\n\n hi: \n\n\n there }" "{{lambda :hi of :there;};}";
+
+  assert_parsed "{ hi: there }" "{{lambda :hi of :there;};}";
 };
 
 let run_tests_with_regex regex => {
