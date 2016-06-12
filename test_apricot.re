@@ -169,6 +169,10 @@ let test_basic_parsing => {
   assert_parsed "{ \n\n\n hi: \n\n\n there }" "{{lambda :hi of :there;};}";
 
   assert_parsed "{ hi: there }" "{{lambda :hi of :there;};}";
+
+  assert_parsed "{ hi: there } { hi: there }" "{({lambda :hi of :there;} {lambda :hi of :there;});}";
+
+  assert_parsed "{ hi: there }\n{ hi: there }" "{{lambda :hi of :there;};{lambda :hi of :there;};}";
 };
 
 let run_tests_with_regex regex => {

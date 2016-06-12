@@ -11,7 +11,7 @@ let main => {
 
   /* let state = Stream.of_channel stdin; */
 
-  let state = "class Apple { ( 2 ); wow print.test 3; }";
+  let state = "class Apple { x : ( 2 ); wow print 3; }";
   /* Printf.printf "start: \"%s\"\n" state; */
 
   let state = Stream.of_string state;
@@ -24,7 +24,7 @@ let main => {
 
   /* let state = Apricot_compile.compile state; */
 
-  /* print_string (Apricot_parse.string_of_abstract_tree state); */
+  print_string (Apricot_parse.string_of_abstract_tree state);
 };
 
 switch (main ()) {
