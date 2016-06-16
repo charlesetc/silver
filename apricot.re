@@ -5,13 +5,14 @@ open Test_apricot;
 open Apricot_balance;
 open Apricot_utils;
 open Apricot_parse;
+open Apricot_type;
 /* open Apricot_compile; */
 
 let main => {
 
   /* let state = Stream.of_channel stdin; */
 
-  let state = "class Apple { x : ( 2 ); wow print 3; }";
+  let state = "class Apple { x y : ( 2 ); { wow print 3 }; }";
   /* Printf.printf "start: \"%s\"\n" state; */
 
   let state = Stream.of_string state;
@@ -22,9 +23,11 @@ let main => {
 
   let state = Apricot_parse.parse state;
 
+  let state = Apricot_type.infer state;
+
   /* let state = Apricot_compile.compile state; */
 
-  print_string (Apricot_parse.string_of_abstract_tree state);
+  print_string (Apricot_type.string_of_typed_tree state);
 };
 
 switch (main ()) {

@@ -1,5 +1,6 @@
 /* apricot utils */
 
+
 type position = {
   line: int,
   column: int,
