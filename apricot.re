@@ -12,7 +12,7 @@ let main => {
 
   /* let state = Stream.of_channel stdin; */
 
-  let state = "class Apple { x y : ( 2 ); { wow print 3 }; }";
+  let state = "map { x z : x y { x : x } x }";
   /* Printf.printf "start: \"%s\"\n" state; */
 
   let state = Stream.of_string state;
