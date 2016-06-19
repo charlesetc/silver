@@ -1,7 +1,7 @@
 # makefile
 
 test: build
-	apricot_test=all ./apricot.native
+	pear_test=all ./pear.native
 
 build:
-	rebuild apricot.native -pkg str
+	rebuild pear.native -pkg str

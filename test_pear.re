@@ -1,8 +1,8 @@
-/* test apricot */
+/* test pear */
 
-open Apricot_token;
-open Apricot_utils;
-open Apricot_balance;
+open Pear_token;
+open Pear_utils;
+open Pear_balance;
 
 let list_of_stream stream => {
   let acc = ref [];
@@ -14,7 +14,7 @@ let list_of_stream stream => {
 
 exception Generic_assertion of string;
 
-exception Token_assertion of (list Apricot_token.token) (list Apricot_token.token);
+exception Token_assertion of (list Pear_token.token) (list Pear_token.token);
 exception String_assertion of string string;
 
 let print_success => print_string "\027[32m.\x1B[0m";
@@ -30,7 +30,7 @@ let test_tokens => {
 
   let assert_tokens string tokens => {
     let state = Stream.of_string string;
-    let state = Apricot_token.token state;
+    let state = Pear_token.token state;
 
     /* Get rid of positions. */
     let state = Stream.from (fun _ => {
@@ -42,46 +42,46 @@ let test_tokens => {
     token_equal (list_of_stream state) tokens;
   };
 
-  assert_tokens "(" [Apricot_token.Left_round];
-  assert_tokens ")" [Apricot_token.Right_round];
-  assert_tokens "{" [Apricot_token.Left_curly];
-  assert_tokens "}" [Apricot_token.Right_curly];
+  assert_tokens "(" [Pear_token.Left_round];
+  assert_tokens ")" [Pear_token.Right_round];
+  assert_tokens "{" [Pear_token.Left_curly];
+  assert_tokens "}" [Pear_token.Right_curly];
 
   assert_tokens "{ }" [
-    Apricot_token.Left_curly,
-    Apricot_token.Space,
-    Apricot_token.Right_curly,
+    Pear_token.Left_curly,
+    Pear_token.Space,
+    Pear_token.Right_curly,
   ];
 
   assert_tokens "hi there" [
-    Apricot_token.Identifier "hi",
-    Apricot_token.Space,
-    Apricot_token.Identifier "there",
+    Pear_token.Identifier "hi",
+    Pear_token.Space,
+    Pear_token.Identifier "there",
   ];
 
   assert_tokens "hi." [
-    Apricot_token.Identifier "hi",
-    Apricot_token.Dot,
+    Pear_token.Identifier "hi",
+    Pear_token.Dot,
   ];
 
   assert_tokens "hi.;" [
-    Apricot_token.Identifier "hi",
-    Apricot_token.Dot,
-    Apricot_token.Newline,
+    Pear_token.Identifier "hi",
+    Pear_token.Dot,
+    Pear_token.Newline,
   ];
 
   assert_tokens "hi.there" [
-    Apricot_token.Identifier "hi",
-    Apricot_token.Dot_literal "there",
+    Pear_token.Identifier "hi",
+    Pear_token.Dot_literal "there",
   ];
 
 
   assert_tokens "'one' \"two\";:" [
-    Apricot_token.String_literal "one",
-    Apricot_token.Space,
-    Apricot_token.String_literal "two",
-    Apricot_token.Newline,
-    Apricot_token.Colon,
+    Pear_token.String_literal "one",
+    Pear_token.Space,
+    Pear_token.String_literal "two",
+    Pear_token.Newline,
+    Pear_token.Colon,
   ];
 };
 
@@ -89,8 +89,8 @@ let test_balanced => {
 
   let assert_balanced string => {
     let state = Stream.of_string string;
-    let state = Apricot_token.token state;
-    let state = Apricot_balance.balance state;
+    let state = Pear_token.token state;
+    let state = Pear_balance.balance state;
 
     /* Strictly evaluate the stream */
     let state = Stream.iter (fun s => ()) state;
@@ -99,13 +99,13 @@ let test_balanced => {
 
   let assert_not_balanced string => {
     let state = Stream.of_string string;
-    let state = Apricot_token.token state;
-    let state = Apricot_balance.balance state;
+    let state = Pear_token.token state;
+    let state = Pear_balance.balance state;
 
     /* Strictly evaluate the stream */
     switch (Stream.iter (fun s => ()) state) {
       | _ => raise (Generic_assertion "tokens are balanced");
-      | exception (Apricot_error _ _) => print_success ();
+      | exception (Pear_error _ _) => print_success ();
     }
   };
 
@@ -126,7 +126,7 @@ let test_basic_parsing => {
 
   let remove_from_string c s => {
     let output = ref "";
-    let add_char c => output := !output ^ Apricot_utils.string_of_char c;
+    let add_char c => output := !output ^ Pear_utils.string_of_char c;
     let s = Stream.of_string s;
     Stream.iter (fun char => {
       switch char {
@@ -139,11 +139,11 @@ let test_basic_parsing => {
 
   let assert_parsed string expected => {
     let state = Stream.of_string string;
-    let state = Apricot_token.token state;
-    let state = Apricot_balance.balance state;
-    let state = Apricot_parse.parse state;
+    let state = Pear_token.token state;
+    let state = Pear_balance.balance state;
+    let state = Pear_parse.parse state;
 
-    let actual = Apricot_parse.string_of_abstract_tree state;
+    let actual = Pear_parse.string_of_abstract_tree state;
 
     let expected = remove_from_string ' ' expected;
     let actual = remove_from_string ' ' actual;
@@ -217,7 +217,7 @@ let run_tests_with_regex regex => {
         let print_tokens str tokens => {
           Printf.printf "%s: " str;
           List.iter
-            (fun t => Printf.printf "%s " (Apricot_token.string_of_token t))
+            (fun t => Printf.printf "%s " (Pear_token.string_of_token t))
             tokens;
           print_char '\n';
         };
@@ -225,7 +225,7 @@ let run_tests_with_regex regex => {
         print_tokens "asserted" ts2;
       };
       | _ => {
-        Apricot_utils.print_apricot_error e;
+        Pear_utils.print_pear_error e;
       }
     };
     print_string ((Printexc.to_string e) ^ "\n");
@@ -233,7 +233,7 @@ let run_tests_with_regex regex => {
 };
 
 let check_tests => {
-  switch (Sys.getenv "apricot_test") {
+  switch (Sys.getenv "pear_test") {
     | "all" => run_tests_with_regex(".*");
     | regex => run_tests_with_regex(regex);
     | exception Not_found => ();

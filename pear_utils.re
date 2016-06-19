@@ -1,4 +1,4 @@
-/* apricot utils */
+/* pear utils */
 
 
 type position = {
@@ -17,16 +17,16 @@ let rec split_at index list => {
   }
 };
 
-exception Apricot_error of string position;
+exception Pear_error of string position;
 
-exception Apricot_bug of string position;
+exception Pear_bug of string position;
 
-let print_apricot_error error => {
+let print_pear_error error => {
   switch error {
-    | Apricot_error desc pos => {
+    | Pear_error desc pos => {
       Printf.printf "line:%d, column:%d\n  %s\n" pos.line pos.column desc;
     }
-    | Apricot_bug desc pos => {
+    | Pear_bug desc pos => {
       Printf.printf "INTERNAL COMPILER ERROR\nline:%d, column:%d\n  %s\n" pos.line pos.column desc;
     }
     | _ => ();

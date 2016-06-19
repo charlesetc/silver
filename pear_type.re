@@ -1,4 +1,4 @@
-/* apricot type */
+/* pear type */
 
 /*
  * This file's purpose is to take a generic syntax tree
@@ -8,15 +8,15 @@
  *
  */
 
-open Apricot_utils;
-open Apricot_parse;
-open Apricot_token;
+open Pear_utils;
+open Pear_parse;
+open Pear_token;
 
-type apricot_type = Unit
+type pear_type = Unit
                   | Integer
                   | Float
                   | String
-                  | Function of apricot_type apricot_type
+                  | Function of pear_type pear_type
                   | Generic of int
                   ;
 
@@ -30,32 +30,32 @@ let string_type_of_int i => {
     "'" ^ string_of_char (Char.chr (i + (Char.code 'a'))) ^ append_str
 };
 
-let rec string_of_apricot_type at => {
+let rec string_of_pear_type at => {
     switch at {
          | Unit => "unit"
          | Integer => "int"
          | Float => "float"
          | String => "string"
-         | Function a b => "(" ^ string_of_apricot_type a ^ "=>" ^ string_of_apricot_type b ^ ")"
+         | Function a b => "(" ^ string_of_pear_type a ^ "=>" ^ string_of_pear_type b ^ ")"
          | Generic i => string_type_of_int i
     }
 };
 
 type typed_unit = {
-    apricot_type: apricot_type,
-    position: Apricot_utils.position,
+    pear_type: pear_type,
+    position: Pear_utils.position,
     data: string,
 };
 
 type typed_tree = Symbol of typed_unit
-                | Function_call of apricot_type typed_tree typed_tree
-                | Function_definition of apricot_type typed_unit (list typed_tree)
+                | Function_call of pear_type typed_tree typed_tree
+                | Function_definition of pear_type typed_unit (list typed_tree)
                 ;
 
 let rec string_of_typed_tree tree => {
-    let string_of_tu tu => switch tu.apricot_type {
+    let string_of_tu tu => switch tu.pear_type {
         | Unit => "unit"
-        | _ => tu.data  ^ ":" ^ string_of_apricot_type tu.apricot_type
+        | _ => tu.data  ^ ":" ^ string_of_pear_type tu.pear_type
     };
 
     switch tree {
@@ -95,24 +95,24 @@ let rec convert_to_typed_tree table tree => {
     };
 
     switch tree {
-        | Apricot_parse.Symbol (token, position) => {
+        | Pear_parse.Symbol (token, position) => {
             switch token {
-                | Apricot_token.Identifier str => Symbol{
-                        apricot_type: (infer_literal_type table str),
+                | Pear_token.Identifier str => Symbol{
+                        pear_type: (infer_literal_type table str),
                         position: position,
                         data: str,
                 }
-                | Apricot_token.String_literal str => Symbol {
-                        apricot_type: String,
+                | Pear_token.String_literal str => Symbol {
+                        pear_type: String,
                         position: position,
                         data: str,
                 }
-                |  _ => raise (Apricot_bug (Printf.sprintf
+                |  _ => raise (Pear_bug (Printf.sprintf
                                             "cannot type-infer with token %s"
-                                            (Apricot_token.string_of_token token)) position)
+                                            (Pear_token.string_of_token token)) position)
             }
         }
-        | Apricot_parse.Call_list abstract_trees => {
+        | Pear_parse.Call_list abstract_trees => {
             let rec handle_call_list abstract_trees => {
                 switch (List.length abstract_trees) {
                     | 1 => {
@@ -120,7 +120,7 @@ let rec convert_to_typed_tree table tree => {
                             (generic_type ())
                             (convert_to_typed_tree table (List.hd abstract_trees))
                             (Symbol {
-                                apricot_type: Unit,
+                                pear_type: Unit,
                                 position: {line: -1, column: -1},
                                 data: "", /* it's a unit */
                             })
@@ -135,7 +135,7 @@ let rec convert_to_typed_tree table tree => {
             };
             handle_call_list (List.rev abstract_trees)
         }
-        | Apricot_parse.Lambda_list arguments abstract_trees => {
+        | Pear_parse.Lambda_list arguments abstract_trees => {
             switch (List.hd arguments) {
                 | Symbol (token, position) => {
                     switch token {
@@ -146,33 +146,33 @@ let rec convert_to_typed_tree table tree => {
                             Function_definition
                                 (generic_type ())
                                 {
-                                    apricot_type: type_of_argument,
+                                    pear_type: type_of_argument,
                                     position: position,
                                     data: data,
                                 }
                                 [
-                                    convert_to_typed_tree table (Apricot_parse.Lambda_list (List.tl arguments) abstract_trees)
+                                    convert_to_typed_tree table (Pear_parse.Lambda_list (List.tl arguments) abstract_trees)
                                 ]
                         }
-                        | _ => raise (Apricot_utils.Apricot_error
+                        | _ => raise (Pear_utils.Pear_error
                                       (Printf.sprintf
                                            "found token %s, which is not an identifier, \
                                            as an argument to a function definition"
-                                           (Apricot_token.string_of_token token))
+                                           (Pear_token.string_of_token token))
                                       position)
                     }
                 }
-                | false_argument => raise (Apricot_utils.Apricot_error
+                | false_argument => raise (Pear_utils.Pear_error
                                             (Printf.sprintf
                                                 "found tee %s, which is not an identifier, \
                                                 as an argumnt to a function definition"
-                                                (Apricot_parse.string_of_abstract_tree false_argument))
+                                                (Pear_parse.string_of_abstract_tree false_argument))
                                             {line: -1, column: -1})
                 | exception (Failure "hd") => {
                     Function_definition
                         (Function Unit (generic_type ()))
                         {
-                            apricot_type: Unit,
+                            pear_type: Unit,
                             position: {line: -1, column: -1},
                             data: "", /* it's a unit */
                         }
@@ -180,11 +180,11 @@ let rec convert_to_typed_tree table tree => {
                 }
             }
         }
-        | Apricot_parse.Sequence_list trees => {
+        | Pear_parse.Sequence_list trees => {
             Function_call Unit
-                (convert_to_typed_tree table (Apricot_parse.Lambda_list [] trees))
+                (convert_to_typed_tree table (Pear_parse.Lambda_list [] trees))
                 (Symbol {
-                    apricot_type: Unit,
+                    pear_type: Unit,
                     position: {line: -1, column: -1},
                     data: "", /* it's a unit */
                 })
@@ -195,7 +195,7 @@ let rec convert_to_typed_tree table tree => {
 let get_type tree => {
     switch tree {
         | Symbol t_unit => {
-            t_unit.apricot_type
+            t_unit.pear_type
         }
         | Function_call a_type function_itself argument => {
             a_type
@@ -216,7 +216,7 @@ let infer_types tree => {
                 [(get_type argument, Function (get_type function_itself) a_type), ...existing]
             }
             | Function_definition a_type t_unit trees => {
-                [(a_type, Function t_unit.apricot_type (get_type (List.nth trees (List.length trees - 1)))), ...existing]
+                [(a_type, Function t_unit.pear_type (get_type (List.nth trees (List.length trees - 1)))), ...existing]
             }
         }
     };
