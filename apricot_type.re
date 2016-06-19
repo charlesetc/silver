@@ -192,24 +192,38 @@ let rec convert_to_typed_tree table tree => {
     }
 };
 
+let get_type tree => {
+    switch tree {
+        | Symbol t_unit => {
+            t_unit.apricot_type
+        }
+        | Function_call a_type function_itself argument => {
+            a_type
+        }
+        | Function_definition a_type t_unit trees => {
+            a_type
+        }
+    }
+};
+
 let infer_types tree => {
-   /* let collect_constraints tree existing => {
-        match tree {
+   let collect_constraints tree existing : list 'a => {
+        switch tree {
             | Symbol t_unit => {
                 existing
             }
-            | Function_call a_type trees => {
-
+            | Function_call a_type function_itself argument => {
+                [(get_type argument, Function (get_type function_itself) a_type), ...existing]
             }
             | Function_definition a_type t_unit trees => {
-
+                [(a_type, Function t_unit.apricot_type (get_type (List.nth trees (List.length trees - 1)))), ...existing]
             }
         }
     };
 
-    // let constraints = collect_constraints tree [];
+    let constraints = collect_constraints tree [];
 
-    // constraints */
+    constraints
 };
 
 let infer tree => {
