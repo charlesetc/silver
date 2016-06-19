@@ -20,6 +20,16 @@ type apricot_type = Unit
                   | Generic of int
                   ;
 
+let string_type_of_int i => {
+    let number = i / 26;
+    let append_str = if (number == 0) {
+        ""
+    } else {
+        string_of_int number
+    };
+    "'" ^ string_of_char (Char.chr (i + (Char.code 'a'))) ^ append_str
+};
+
 let rec string_of_apricot_type at => {
     switch at {
          | Unit => "unit"
@@ -27,7 +37,7 @@ let rec string_of_apricot_type at => {
          | Float => "float"
          | String => "string"
          | Function a b => "(" ^ string_of_apricot_type a ^ "=>" ^ string_of_apricot_type b ^ ")"
-         | Generic i => string_of_char (Char.chr (i + (Char.code 'a')))
+         | Generic i => string_type_of_int i
     }
 };
 
@@ -38,7 +48,7 @@ type typed_unit = {
 };
 
 type typed_tree = Symbol of typed_unit
-                | Function_call of apricot_type (list typed_tree)
+                | Function_call of apricot_type typed_tree typed_tree
                 | Function_definition of apricot_type typed_unit (list typed_tree)
                 ;
 
@@ -50,8 +60,8 @@ let rec string_of_typed_tree tree => {
 
     switch tree {
         | Symbol tu => string_of_tu tu
-        | Function_call ty trees => {
-            "(" ^ (String.concat " " (List.map string_of_typed_tree trees)) ^ ")"
+        | Function_call ty tree1 tree2 => {
+            "(" ^ " " ^ string_of_typed_tree tree1 ^ " " ^ string_of_typed_tree tree2 ^ " " ^ ")"
         }
         | Function_definition ty tu trees => {
             "{" ^ (string_of_tu tu) ^  " -> " ^ (String.concat "; " (List.map string_of_typed_tree trees)) ^ "}"
@@ -102,9 +112,29 @@ let rec convert_to_typed_tree table tree => {
                                             (Apricot_token.string_of_token token)) position)
             }
         }
-        | Apricot_parse.Call_list abstract_trees => Function_call
-            (generic_type ())
-            (List.map (convert_to_typed_tree table) abstract_trees)
+        | Apricot_parse.Call_list abstract_trees => {
+            let rec handle_call_list abstract_trees => {
+                switch (List.length abstract_trees) {
+                    | 1 => {
+                        Function_call
+                            (generic_type ())
+                            (convert_to_typed_tree table (List.hd abstract_trees))
+                            (Symbol {
+                                apricot_type: Unit,
+                                position: {line: -1, column: -1},
+                                data: "", /* it's a unit */
+                            })
+                    }
+                    | _ => {
+                        Function_call
+                            (generic_type ())
+                            (handle_call_list (List.tl abstract_trees))
+                            (convert_to_typed_tree table (List.hd abstract_trees))
+                    }
+                }
+            };
+            handle_call_list (List.rev abstract_trees)
+        }
         | Apricot_parse.Lambda_list arguments abstract_trees => {
             switch (List.hd arguments) {
                 | Symbol (token, position) => {
@@ -114,7 +144,7 @@ let rec convert_to_typed_tree table tree => {
                             let table = Hashtbl.copy table;
                             Hashtbl.add table data type_of_argument;
                             Function_definition
-                                (Function (generic_type ()) (generic_type ()))
+                                (generic_type ())
                                 {
                                     apricot_type: type_of_argument,
                                     position: position,
@@ -151,23 +181,31 @@ let rec convert_to_typed_tree table tree => {
             }
         }
         | Apricot_parse.Sequence_list trees => {
-            Function_call Unit  [convert_to_typed_tree table (Apricot_parse.Lambda_list [] trees),
-                        Symbol {
-                            apricot_type: Unit,
-                            position: {line: -1, column: -1},
-                            data: "", /* it's a unit */
-                        }
-            ]
+            Function_call Unit
+                (convert_to_typed_tree table (Apricot_parse.Lambda_list [] trees))
+                (Symbol {
+                    apricot_type: Unit,
+                    position: {line: -1, column: -1},
+                    data: "", /* it's a unit */
+                })
         }
     }
 };
 
 let infer_types tree => {
-    /*/ let collect_constraints tree existing => {
-    //     match tree {
-    //         | Symbol 
-    //     }
-    // };
+   /* let collect_constraints tree existing => {
+        match tree {
+            | Symbol t_unit => {
+                existing
+            }
+            | Function_call a_type trees => {
+
+            }
+            | Function_definition a_type t_unit trees => {
+
+            }
+        }
+    };
 
     // let constraints = collect_constraints tree [];
 
