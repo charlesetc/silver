@@ -61,7 +61,7 @@ let rec string_of_typed_tree tree => {
     switch tree {
         | Symbol tu => string_of_tu tu
         | Function_call ty tree1 tree2 => {
-            "(" ^ " " ^ string_of_typed_tree tree1 ^ " " ^ string_of_typed_tree tree2 ^ " " ^ ")"
+            "(" ^ " " ^ string_of_typed_tree tree1 ^ " $ " ^ string_of_typed_tree tree2 ^ " " ^ ")"
         }
         | Function_definition ty tu trees => {
             "{" ^ (string_of_tu tu) ^  " -> " ^ (String.concat "; " (List.map string_of_typed_tree trees)) ^ "}"
@@ -141,15 +141,11 @@ let rec convert_to_typed_tree table tree => {
 
             let rec handle_call_list abstract_trees => {
                 switch (List.length abstract_trees) {
-                    | 1 => {
+                    | 2 => {
                         Function_call
                             (generic_type ())
+                            (convert_to_typed_tree table (List.nth abstract_trees 1))
                             (convert_to_typed_tree table (List.hd abstract_trees))
-                            (Symbol {
-                                pear_type: Unit,
-                                position: {line: -1, column: -1},
-                                data: "", /* it's a unit */
-                            })
                     }
                     | _ => {
                         Function_call
@@ -169,16 +165,27 @@ let rec convert_to_typed_tree table tree => {
                             let type_of_argument = generic_type ();
                             let table = Hashtbl.copy table;
                             Hashtbl.add table data type_of_argument;
-                            Function_definition
-                                (generic_type ())
-                                {
-                                    pear_type: type_of_argument,
-                                    position: position,
-                                    data: data,
-                                }
-                                [
-                                    convert_to_typed_tree table (Pear_parse.Lambda_list (List.tl arguments) abstract_trees)
-                                ]
+                            if (List.length arguments == 1) {
+                                Function_definition
+                                    (generic_type ())
+                                    {
+                                        pear_type: type_of_argument,
+                                        position: position,
+                                        data: data,
+                                    }
+                                    (List.map (convert_to_typed_tree table) abstract_trees)
+                            } else {
+                                Function_definition
+                                    (generic_type ())
+                                    {
+                                        pear_type: type_of_argument,
+                                        position: position,
+                                        data: data,
+                                    }
+                                    [
+                                        convert_to_typed_tree table (Pear_parse.Lambda_list (List.tl arguments) abstract_trees)
+                                    ]
+                            }
                         }
                         | _ => raise (Pear_utils.Pear_error
                                       (Printf.sprintf
@@ -232,40 +239,99 @@ let get_type tree => {
     }
 };
 
-let infer_types tree => {
-   let rec collect_constraints tree : list 'a => {
-        let output = ref [];
-        let constrain argument =>
-            output := [argument, ...!output];
-        switch tree {
-            | Function_call a_type function_itself argument => {
-                /* keep the constraints for both the function and its argument */
-                List.iter constrain (collect_constraints argument);
-                List.iter constrain (collect_constraints function_itself);
+let print_constraints constraints =>
+    List.map (fun (a, b) => {
+        print_string ("\t" ^ (string_of_pear_type a) ^ " == " ^ (string_of_pear_type b) ^ "\n")
+    }) constraints;
 
-                /* the function should be of type function(argument_type)return_type */
-                constrain (get_type function_itself, Function (get_type argument) a_type);
-            }
-            | Function_definition a_type t_unit trees => {
-                /* iterate over the trees and keep their constraints */
-                List.iter (fun tree => List.iter constrain (collect_constraints tree)) trees;
 
-                /* implicit return from a list of expressions */
-                let last_argument = List.nth trees (List.length trees - 1);
-                constrain (a_type, Function t_unit.pear_type (get_type last_argument));
-            }
-            | Symbol t_unit => ()
-        };
-        !output
+let rec collect_constraints tree : list 'a => {
+    let output = ref [];
+    let constrain argument =>
+        output := [argument, ...!output];
+    switch tree {
+        | Function_call a_type function_itself argument => {
+            /* keep the constraints for both the function and its argument */
+            List.iter constrain (collect_constraints argument);
+            List.iter constrain (collect_constraints function_itself);
+
+            /* the function should be of type function(argument_type)return_type */
+            constrain (get_type function_itself, Function (get_type argument) a_type);
+        }
+        | Function_definition a_type t_unit trees => {
+            /* iterate over the trees and keep their constraints */
+            List.iter (fun tree => List.iter constrain (collect_constraints tree)) trees;
+
+            /* implicit return from a list of expressions */
+            let last_argument = List.nth trees (List.length trees - 1);
+            constrain (a_type, Function t_unit.pear_type (get_type last_argument));
+        }
+        | Symbol t_unit => ()
+    };
+    !output
+};
+
+let rec occurs a t => switch t {
+    | Generic b => a == b;
+    | Function u v => occurs a u || occurs a v;
+    | _ => false;
+};
+
+let apply substitutions typ => {
+    let rec substitute x type1 type2 => {
+        switch type2 {
+            | Generic y => if (x == y) { type1 } else { type2 }
+            | Function a b => Function (substitute x type1 a) (substitute x type1 b)
+            | _ => type1 /* raise (Pear_utils.empty_pear_bug "Don't know what do with this at the moment") */
+        }
     };
 
-    let constraints = collect_constraints tree;
+    List.fold_right (fun (x, e) => substitute x e ) substitutions typ;
+};
 
-    constraints
+let rec unify constraints => {
+    let rec unify_one t1 t2 => {
+        switch (t1, t2) {
+            | (Generic x, Generic y) => if (x == y) { [] } else { [(x, t2)] };
+            | (Function a b, Function c d) => unify [(a, c), (b, d)];
+            | (Function a b as z, Generic x) | (Generic x, Function a b as z) =>
+               if (occurs x z) {
+                    raise (Pear_utils.empty_pear_bug "not unifiable - circularity")
+               } else {
+                    [(x, z)]
+               };
+            | (Generic x, a) | (a, Generic x) => [(x, a)]; /* I'm not sure about this */
+            | (a, b) => []; /* or this */
+        }
+    };
+
+    if (List.length constraints == 0) {
+        []
+    } else {
+        let (x, y) = List.hd constraints;
+        let unified_0 = unify (List.tl constraints);
+        let unified_1 = unify_one (apply unified_0 x) (apply unified_0 y);
+        List.append unified_0 unified_1
+    }
 };
 
 let infer tree => {
     let tree = convert_to_typed_tree (Hashtbl.create 16) tree;
-    /* let tree = infer_types tree; */
-    tree
+
+    switch tree {
+        | Function_call _ (Function_definition _ _ body) _ => {
+            let tree = List.hd body;
+            let constraints = collect_constraints tree;
+            print_string "constraints:\n";
+            print_constraints constraints;
+            print_string "\n";
+            let substitutions = unify constraints;
+            let treetype = apply substitutions (get_type tree);
+            print_string "type:\n\t";
+            print_string (string_of_pear_type treetype);
+            print_string "\n\n";
+            tree
+        }
+        | _ => raise (Pear_utils.empty_pear_bug "the way it's set up this won't happen")
+    }
 };

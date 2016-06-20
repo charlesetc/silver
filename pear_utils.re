@@ -21,6 +21,10 @@ exception Pear_error of string position;
 
 exception Pear_bug of string position;
 
+let empty_pear_bug str => {
+    Pear_bug str {line: -1, column: -1}
+};
+
 let print_pear_error error => {
   switch error {
     | Pear_error desc pos => {

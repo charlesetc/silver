@@ -6,7 +6,6 @@ type token
   = Identifier of string
   | String_literal of string
   | Dot_literal of string
-  | String
   | Left_curly
   | Right_curly
   | Left_round
