@@ -69,25 +69,42 @@ let rec string_of_typed_tree tree => {
     }
 };
 
-let i = ref 0;
+let generic_type_count = ref 0;
 
 let rec convert_to_typed_tree table tree => {
+    /* This function takes a hash table (starts as empty),
+     * and an abstract tree. It converts an abstract tree
+     * to a typed tree.
+     *
+     * There doesn't need to be a correlation between the
+     * typed tree and the original code, unlike the abstract
+     * tree. (This is because the abstract tree will be used
+     * for macros)
+     */
+
     let generic_type () => {
-        let a = !i;
-        i := !i + 1;
+        /* make a new generic type that hasn't been used before */
+        let a = !generic_type_count;
+        generic_type_count := !generic_type_count + 1;
         Generic a
     };
 
     let infer_literal_type table str => {
+        /* Here we convert numbers/floats - things that
+         * would normally be parsed as symbols to
+         * their own type.
+         */
         let looks_like_integer str => {
             false
         };
         switch (Hashtbl.find table str) {
+            /* If there is already a type for this symbol use it */
             | t => t;
             | exception Not_found => {
                 if (looks_like_integer str) {
                     Integer
                 } else {
+                    /* otherwise make a new one */
                     generic_type ()
                 }
             }
@@ -96,6 +113,11 @@ let rec convert_to_typed_tree table tree => {
 
     switch tree {
         | Pear_parse.Symbol (token, position) => {
+
+            /* Symbols have a single token - each of which
+             * is associated with a type
+             */
+
             switch token {
                 | Pear_token.Identifier str => Symbol{
                         pear_type: (infer_literal_type table str),
@@ -113,6 +135,10 @@ let rec convert_to_typed_tree table tree => {
             }
         }
         | Pear_parse.Call_list abstract_trees => {
+
+            /* this will turn `(2 3 4 5 6)` into
+             * `(2 (3 (4 (5 6))))` */
+
             let rec handle_call_list abstract_trees => {
                 switch (List.length abstract_trees) {
                     | 1 => {
@@ -207,21 +233,33 @@ let get_type tree => {
 };
 
 let infer_types tree => {
-   let collect_constraints tree existing : list 'a => {
+   let rec collect_constraints tree : list 'a => {
+        let output = ref [];
+        let constrain argument =>
+            output := [argument, ...!output];
         switch tree {
-            | Symbol t_unit => {
-                existing
-            }
             | Function_call a_type function_itself argument => {
-                [(get_type argument, Function (get_type function_itself) a_type), ...existing]
+                /* keep the constraints for both the function and its argument */
+                List.iter constrain (collect_constraints argument);
+                List.iter constrain (collect_constraints function_itself);
+
+                /* the function should be of type function(argument_type)return_type */
+                constrain (get_type function_itself, Function (get_type argument) a_type);
             }
             | Function_definition a_type t_unit trees => {
-                [(a_type, Function t_unit.pear_type (get_type (List.nth trees (List.length trees - 1)))), ...existing]
+                /* iterate over the trees and keep their constraints */
+                List.iter (fun tree => List.iter constrain (collect_constraints tree)) trees;
+
+                /* implicit return from a list of expressions */
+                let last_argument = List.nth trees (List.length trees - 1);
+                constrain (a_type, Function t_unit.pear_type (get_type last_argument));
             }
-        }
+            | Symbol t_unit => ()
+        };
+        !output
     };
 
-    let constraints = collect_constraints tree [];
+    let constraints = collect_constraints tree;
 
     constraints
 };
