@@ -61,15 +61,16 @@ let rec string_of_typed_tree tree => {
     switch tree {
         | Symbol tu => string_of_tu tu
         | Function_call ty tree1 tree2 => {
-            "(" ^ " " ^ string_of_typed_tree tree1 ^ " $ " ^ string_of_typed_tree tree2 ^ " " ^ ")"
+            "(" ^ " " ^ string_of_typed_tree tree1 ^ " $ " ^ string_of_typed_tree tree2 ^ " " ^ ") : " ^ string_of_pear_type ty
         }
         | Function_definition ty tu trees => {
-            "{" ^ (string_of_tu tu) ^  " -> " ^ (String.concat "; " (List.map string_of_typed_tree trees)) ^ "}"
+            "{" ^ (string_of_tu tu) ^  " -> " ^ (String.concat "; " (List.map string_of_typed_tree trees)) ^ "} : " ^ string_of_pear_type ty
         }
     }
 };
 
 let generic_type_count = ref 0;
+let reset_count => generic_type_count := 0;
 
 let rec convert_to_typed_tree table tree => {
     /* This function takes a hash table (starts as empty),
@@ -105,7 +106,9 @@ let rec convert_to_typed_tree table tree => {
                     Integer
                 } else {
                     /* otherwise make a new one */
-                    generic_type ()
+                    let typ = generic_type ();
+                    Hashtbl.add table str typ;
+                    typ
                 }
             }
         }
@@ -117,17 +120,20 @@ let rec convert_to_typed_tree table tree => {
             /* Symbols have a single token - each of which
              * is associated with a type
              */
-
             switch token {
-                | Pear_token.Identifier str => Symbol{
+                | Pear_token.Identifier str => {
+                    Symbol{
                         pear_type: (infer_literal_type table str),
                         position: position,
                         data: str,
+                    }
                 }
-                | Pear_token.String_literal str => Symbol {
+                | Pear_token.String_literal str => {
+                    Symbol {
                         pear_type: String,
                         position: position,
                         data: str,
+                    }
                 }
                 |  _ => raise (Pear_bug (Printf.sprintf
                                             "cannot type-infer with token %s"
@@ -291,7 +297,7 @@ let apply substitutions typ => {
 
 let rec unify constraints => {
     let rec unify_one t1 t2 => {
-        switch (t1, t2) {
+        switch (t2, t1) {
             | (Generic x, Generic y) => if (x == y) { [] } else { [(x, t2)] };
             | (Function a b, Function c d) => unify [(a, c), (b, d)];
             | (Function a b as z, Generic x) | (Generic x, Function a b as z) =>
@@ -315,23 +321,22 @@ let rec unify constraints => {
     }
 };
 
-let infer tree => {
+let infer_all tree => {
     let tree = convert_to_typed_tree (Hashtbl.create 16) tree;
 
     switch tree {
         | Function_call _ (Function_definition _ _ body) _ => {
             let tree = List.hd body;
             let constraints = collect_constraints tree;
-            print_string "constraints:\n";
-            print_constraints constraints;
-            print_string "\n";
             let substitutions = unify constraints;
             let treetype = apply substitutions (get_type tree);
-            print_string "type:\n\t";
-            print_string (string_of_pear_type treetype);
-            print_string "\n\n";
-            tree
+            (tree, constraints, treetype)
         }
         | _ => raise (Pear_utils.empty_pear_bug "the way it's set up this won't happen")
     }
+};
+
+let infer tree => {
+    let (tree, _, _) = infer_all tree;
+    tree
 };

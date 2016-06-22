@@ -3,6 +3,7 @@
 open Pear_token;
 open Pear_utils;
 open Pear_balance;
+open Pear_type;
 
 let list_of_stream stream => {
   let acc = ref [];
@@ -122,21 +123,21 @@ let test_balanced => {
   assert_not_balanced "()}";
 };
 
+let remove_from_string c s => {
+let output = ref "";
+let add_char c => output := !output ^ Pear_utils.string_of_char c;
+let s = Stream.of_string s;
+Stream.iter (fun char => {
+  switch char {
+    | new_char when new_char == c => ();
+    | a => add_char a;
+  }
+}) s;
+!output
+};
+
+
 let test_basic_parsing => {
-
-  let remove_from_string c s => {
-    let output = ref "";
-    let add_char c => output := !output ^ Pear_utils.string_of_char c;
-    let s = Stream.of_string s;
-    Stream.iter (fun char => {
-      switch char {
-        | new_char when new_char == c => ();
-        | a => add_char a;
-      }
-    }) s;
-    !output
-  };
-
   let assert_parsed string expected => {
     let state = Stream.of_string string;
     let state = Pear_token.token state;
@@ -175,6 +176,41 @@ let test_basic_parsing => {
   assert_parsed "{ hi: there }\n{ hi: there }" "{{lambda :hi of :there;};{lambda :hi of :there;};}";
 };
 
+let test_type_inference => {
+
+  let assert_typed string expected => {
+    let state = Stream.of_string string;
+    let state = Pear_token.token state;
+    let state = Pear_balance.balance state;
+    let state = Pear_parse.parse state;
+    let (tree, constraints, pear_type) = Pear_type.infer_all state;
+
+    let actual = Pear_type.string_of_pear_type pear_type;
+
+    let expected = remove_from_string ' ' expected;
+    let actual = remove_from_string ' ' actual;
+
+    Pear_type.reset_count ();
+
+    switch (assert (actual == expected)) {
+      | _ => print_success ();
+      | exception (Assert_failure _) => {
+          Pear_type.print_constraints constraints;
+          print_string (Pear_type.string_of_typed_tree tree);
+          raise (String_assertion actual expected)
+      }
+    };
+  };
+
+  assert_typed "x" "'a";
+
+  assert_typed "{x : x}" "('a=>'a)";
+
+  assert_typed "{x : x a}" "(('b=>'c)=>'c)";
+
+  assert_typed "{x : a c ; x a}" "((('b=>'d)=>'e)=>'e)";
+};
+
 let run_tests_with_regex regex => {
   let regex = Str.regexp regex;
 
@@ -182,6 +218,7 @@ let run_tests_with_regex regex => {
     ("test tokens", test_tokens),
     ("test balanced", test_balanced),
     ("test basic parsing", test_basic_parsing),
+    ("test type inference", test_type_inference),
   ];
 
   let errors = ref [];
