@@ -283,16 +283,49 @@ let rec occurs a t => switch t {
     | _ => false;
 };
 
-let apply substitutions typ => {
-    let rec substitute x type1 type2 => {
-        switch type2 {
-            | Generic y => if (x == y) { type1 } else { type2 }
-            | Function a b => Function (substitute x type1 a) (substitute x type1 b)
-            | _ => type1 /* raise (Pear_utils.empty_pear_bug "Don't know what do with this at the moment") */
+let rec substitute x type1 type2 => {
+    switch type2 {
+        | Generic y => if (x == y) { type1 } else { type2 }
+        | Function a b => Function (substitute x type1 a) (substitute x type1 b)
+        | _ => type1 /* raise (Pear_utils.empty_pear_bug "Don't know what do with this at the moment") */
+    }
+};
+
+let apply_to_type substitutions typ => {
+    List.fold_right (fun (x, e) z => substitute x e z ) substitutions typ
+};
+
+let apply_to_tree substitutions tree => {
+
+    let apply_typed_unit {pear_type, position, data} (x, typ) => {
+        {
+            pear_type: substitute x typ pear_type,
+            position,
+            data,
         }
     };
 
-    List.fold_right (fun (x, e) => substitute x e ) substitutions typ;
+    let rec apply_tree (x, typ) tree => {
+        switch tree {
+            | Symbol tunit => {
+                Symbol
+                    (apply_typed_unit tunit (x, typ))
+            }
+            | Function_call ptype t1 t2 => {
+                Function_call
+                    (substitute x typ ptype)
+                    (apply_tree (x, typ) t1)
+                    (apply_tree (x, typ) t2)
+            }
+            | Function_definition ptype tunit ts =>
+                Function_definition
+                    (substitute x typ ptype)
+                    (apply_typed_unit tunit (x, typ))
+                    (List.map (apply_tree (x, typ)) ts)
+        }
+    };
+    
+    List.fold_right apply_tree substitutions tree
 };
 
 let rec unify constraints => {
@@ -316,7 +349,7 @@ let rec unify constraints => {
     } else {
         let (x, y) = List.hd constraints;
         let unified_0 = unify (List.tl constraints);
-        let unified_1 = unify_one (apply unified_0 x) (apply unified_0 y);
+        let unified_1 = unify_one (apply_to_type unified_0 x) (apply_to_type unified_0 y);
         List.append unified_0 unified_1
     }
 };
@@ -329,7 +362,10 @@ let infer_all tree => {
             let tree = List.hd body;
             let constraints = collect_constraints tree;
             let substitutions = unify constraints;
-            let treetype = apply substitutions (get_type tree);
+            let treetype = apply_to_type substitutions (get_type tree);
+
+            let tree = apply_to_tree substitutions tree;
+
             (tree, constraints, treetype)
         }
         | _ => raise (Pear_utils.empty_pear_bug "the way it's set up this won't happen")
