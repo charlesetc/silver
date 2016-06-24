@@ -8,6 +8,12 @@ type position = {
 
 let string_of_char = String.make 1;
 
+let list_of_string string => {
+    let lst = ref [];
+    String.iter (fun c => lst := [c, ...!lst]) string;
+    !lst
+};
+
 let rec split_at index list => {
   if (index == 0) {
     ([], list)
@@ -23,6 +29,10 @@ exception Pear_bug of string position;
 
 let empty_pear_bug str => {
     Pear_bug str {line: -1, column: -1}
+};
+
+let empty_pear_error str => {
+    Pear_error str {line: -1, column: -1}
 };
 
 let print_pear_error error => {

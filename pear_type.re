@@ -95,8 +95,9 @@ let rec convert_to_typed_tree table tree => {
          * would normally be parsed as symbols to
          * their own type.
          */
-        let looks_like_integer str => {
-            false
+        let looks_like_integer str : bool => switch (int_of_string str) {
+            | _ => true
+            | exception _ => false
         };
         switch (Hashtbl.find table str) {
             /* If there is already a type for this symbol use it */
@@ -250,6 +251,11 @@ let print_constraints constraints =>
         print_string ("\t" ^ (string_of_pear_type a) ^ " == " ^ (string_of_pear_type b) ^ "\n")
     }) constraints;
 
+let print_substitutions constraints =>
+    List.map (fun (a, b) => {
+        print_string ("\t" ^ string_type_of_int a ^ " == " ^ string_of_pear_type b ^ "\n")
+    }) constraints;
+
 
 let rec collect_constraints tree : list 'a => {
     let output = ref [];
@@ -283,11 +289,12 @@ let rec occurs a t => switch t {
     | _ => false;
 };
 
-let rec substitute x type1 type2 => {
-    switch type2 {
-        | Generic y => if (x == y) { type1 } else { type2 }
-        | Function a b => Function (substitute x type1 a) (substitute x type1 b)
-        | _ => type1 /* raise (Pear_utils.empty_pear_bug "Don't know what do with this at the moment") */
+let rec substitute x replacement pear_type => {
+    switch pear_type {
+        /* actually substitute here */
+        | Generic y => if (x == y) { replacement } else { pear_type }
+        | Function a b => Function (substitute x replacement a) (substitute x replacement b)
+        | _ => pear_type
     }
 };
 
@@ -354,15 +361,23 @@ let rec unify constraints => {
     }
 };
 
-let infer_all tree => {
+let infer_all tree respect_outer => {
     let tree = convert_to_typed_tree (Hashtbl.create 16) tree;
 
     switch tree {
         | Function_call _ (Function_definition _ _ body) _ => {
-            let tree = List.hd body;
+            let tree = if respect_outer { tree } else { List.hd body };
             let constraints = collect_constraints tree;
             let substitutions = unify constraints;
             let treetype = apply_to_type substitutions (get_type tree);
+
+            /*
+            print_string (string_of_typed_tree tree);
+            print_string "constraints:\n";
+            print_constraints constraints;
+            print_string "\nsubstitutions:\n";
+            print_substitutions substitutions;
+            */
 
             let tree = apply_to_tree substitutions tree;
 
@@ -372,7 +387,12 @@ let infer_all tree => {
     }
 };
 
+let infer_for_test tree => {
+    let (tree, _, _) = infer_all tree false;
+    tree
+};
+
 let infer tree => {
-    let (tree, _, _) = infer_all tree;
+    let (tree, _, _) = infer_all tree true;
     tree
 };

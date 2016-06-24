@@ -12,9 +12,13 @@ let main => {
 
   /* let state = Stream.of_channel stdin; */
 
-  let state = "{x : x a b}";
+  let state = "
+map { b 1 2 }
+";
 
-  Printf.printf "start:\n\t\"%s\"\n\n" state;
+  /*
+  Printf.printf "start:\n\t%s\n\n" state;
+  */
 
   let state = Stream.of_string state;
 
@@ -26,11 +30,13 @@ let main => {
 
   let state = Pear_type.infer state;
 
-  /* let state = Pear_compile.compile state; */
+  /*
+   * let state = Pear_compile.compile state;
 
   print_string "tree:\n\t";
   print_string (Pear_type.string_of_typed_tree state);
   print_string "\n";
+   */
 };
 
 switch (main ()) {

@@ -183,7 +183,9 @@ let test_type_inference => {
     let state = Pear_token.token state;
     let state = Pear_balance.balance state;
     let state = Pear_parse.parse state;
-    let (tree, constraints, pear_type) = Pear_type.infer_all state;
+
+                                                /* don't respect the outer tree */
+    let (tree, constraints, pear_type) = Pear_type.infer_all state false;
 
     let actual = Pear_type.string_of_pear_type pear_type;
 
@@ -209,6 +211,8 @@ let test_type_inference => {
   assert_typed "{x : x a}" "(('b=>'c)=>'c)";
 
   assert_typed "{x : a c ; x a}" "((('b=>'d)=>'e)=>'e)";
+
+  assert_typed "{x : x 1 2 3}" "((int=>(int=>(int=>'d)))=>'d)";
 };
 
 let run_tests_with_regex regex => {
