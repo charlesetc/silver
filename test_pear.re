@@ -3,7 +3,7 @@
 open Pear_token;
 open Pear_utils;
 open Pear_balance;
-open Pear_type;
+open Pear_type_old;
 
 let list_of_stream stream => {
   let acc = ref [];
@@ -185,20 +185,20 @@ let test_type_inference => {
     let state = Pear_parse.parse state;
 
                                                 /* don't respect the outer tree */
-    let (tree, constraints, pear_type) = Pear_type.infer_all state false;
+    let (tree, constraints, pear_type) = Pear_type_old.infer_all state false;
 
-    let actual = Pear_type.string_of_pear_type pear_type;
+    let actual = Pear_type_old.string_of_pear_type pear_type;
 
     let expected = remove_from_string ' ' expected;
     let actual = remove_from_string ' ' actual;
 
-    Pear_type.reset_count ();
+    Pear_type_old.reset_count ();
 
     switch (assert (actual == expected)) {
       | _ => print_success ();
       | exception (Assert_failure _) => {
-          Pear_type.print_constraints constraints;
-          print_string (Pear_type.string_of_typed_tree tree);
+          Pear_type_old.print_constraints constraints;
+          print_string (Pear_type_old.string_of_typed_tree tree);
           raise (String_assertion actual expected)
       }
     };

@@ -5,7 +5,7 @@ open Test_pear;
 open Pear_balance;
 open Pear_utils;
 open Pear_parse;
-open Pear_type;
+open Pear_type_old;
 /* open Pear_compile; */
 
 let main => {
@@ -28,13 +28,13 @@ map { b 1 2 }
 
   let state = Pear_parse.parse state;
 
-  let state = Pear_type.infer state;
+  let state = Pear_type_old.infer state;
 
   /*
    * let state = Pear_compile.compile state;
 
   print_string "tree:\n\t";
-  print_string (Pear_type.string_of_typed_tree state);
+  print_string (Pear_type_old.string_of_typed_tree state);
   print_string "\n";
    */
 };
