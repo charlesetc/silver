@@ -5,6 +5,7 @@ open Test_pear;
 open Pear_balance;
 open Pear_utils;
 open Pear_parse;
+open Pear_type;
 open Pear_type_old;
 /* open Pear_compile; */
 

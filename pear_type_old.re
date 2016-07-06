@@ -1,4 +1,4 @@
-/* pear type */
+/* pear type old */
 
 /*
  * This file's purpose is to take a generic syntax tree
@@ -55,6 +55,7 @@ type typed_tree = Symbol of typed_unit
 let rec string_of_typed_tree tree => {
     let string_of_tu tu => switch tu.pear_type {
         | Unit => "unit"
+        /* | _ => tu.data  ^ ":" ^ string_of_pear_type tu.pear_type */
         | _ => tu.data  ^ ":" ^ string_of_pear_type tu.pear_type
     };
 
