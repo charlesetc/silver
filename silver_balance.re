@@ -1,12 +1,12 @@
-/* pear balance */
+/* silver balance */
 
-open Pear_utils;
-open Pear_token;
+open Silver_utils;
+open Silver_token;
 
 let balance stream => {
   let stack = Stack.create ();
 
-  let matched_symbols = [Pear_token.Left_round, Pear_token.Left_curly];
+  let matched_symbols = [Silver_token.Left_round, Silver_token.Left_curly];
 
   let is_matched_symbol symbol => {
     switch (List.find (fun x => x == symbol) matched_symbols) {
@@ -28,14 +28,14 @@ let balance stream => {
             right_position.column
             (string_of_token right_token)
             ;
-          raise (Pear_error error_string left_position);
+          raise (Silver_error error_string left_position);
         }
       }
       | exception Stack.Empty => {
         let error_string = Printf.sprintf
           "token %s found without previous matching token"
           (string_of_token starting_token);
-        raise (Pear_error error_string right_position);
+        raise (Silver_error error_string right_position);
       }
     }
   };
@@ -43,11 +43,11 @@ let balance stream => {
   let inner_balance _ => {
     let transparent_return_value = Stream.peek stream;
     switch (Stream.next stream) {
-      | (Pear_token.Right_round, right_position) => {
-        ensure Pear_token.Right_round Pear_token.Left_round right_position;
+      | (Silver_token.Right_round, right_position) => {
+        ensure Silver_token.Right_round Silver_token.Left_round right_position;
       }
-      | (Pear_token.Right_curly, right_position) => {
-        ensure Pear_token.Right_curly Pear_token.Left_curly right_position;
+      | (Silver_token.Right_curly, right_position) => {
+        ensure Silver_token.Right_curly Silver_token.Left_curly right_position;
       }
       | (t, left_position) when is_matched_symbol t => Stack.push (t, left_position) stack;
       | _ => ();
@@ -56,7 +56,7 @@ let balance stream => {
           let error_string = Printf.sprintf
             "token %s found without matching close token"
             (string_of_token t);
-          raise (Pear_error error_string left_position);
+          raise (Silver_error error_string left_position);
         }
         | exception Stack.Empty => ();
       };

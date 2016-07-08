@@ -1,4 +1,4 @@
-/* pear type old */
+/* silver type old */
 
 /*
  * This file's purpose is to take a generic syntax tree
@@ -8,15 +8,15 @@
  *
  */
 
-open Pear_utils;
-open Pear_parse;
-open Pear_token;
+open Silver_utils;
+open Silver_parse;
+open Silver_token;
 
-type pear_type = Unit
+type silver_type = Unit
                   | Integer
                   | Float
                   | String
-                  | Function of pear_type pear_type
+                  | Function of silver_type silver_type
                   | Generic of int
                   ;
 
@@ -30,42 +30,42 @@ let string_type_of_int i => {
     "'" ^ string_of_char (Char.chr (i + (Char.code 'a'))) ^ append_str
 };
 
-let rec string_of_pear_type at => {
+let rec string_of_silver_type at => {
     switch at {
          | Unit => "unit"
          | Integer => "int"
          | Float => "float"
          | String => "string"
-         | Function a b => "(" ^ string_of_pear_type a ^ "=>" ^ string_of_pear_type b ^ ")"
+         | Function a b => "(" ^ string_of_silver_type a ^ "=>" ^ string_of_silver_type b ^ ")"
          | Generic i => string_type_of_int i
     }
 };
 
 type typed_unit = {
-    pear_type: pear_type,
-    position: Pear_utils.position,
+    silver_type: silver_type,
+    position: Silver_utils.position,
     data: string,
 };
 
 type typed_tree = Symbol of typed_unit
-                | Function_call of pear_type typed_tree typed_tree
-                | Function_definition of pear_type typed_unit (list typed_tree)
+                | Function_call of silver_type typed_tree typed_tree
+                | Function_definition of silver_type typed_unit (list typed_tree)
                 ;
 
 let rec string_of_typed_tree tree => {
-    let string_of_tu tu => switch tu.pear_type {
+    let string_of_tu tu => switch tu.silver_type {
         | Unit => "unit"
-        /* | _ => tu.data  ^ ":" ^ string_of_pear_type tu.pear_type */
-        | _ => tu.data  ^ ":" ^ string_of_pear_type tu.pear_type
+        /* | _ => tu.data  ^ ":" ^ string_of_silver_type tu.silver_type */
+        | _ => tu.data  ^ ":" ^ string_of_silver_type tu.silver_type
     };
 
     switch tree {
         | Symbol tu => string_of_tu tu
         | Function_call ty tree1 tree2 => {
-            "(" ^ " " ^ string_of_typed_tree tree1 ^ " $ " ^ string_of_typed_tree tree2 ^ " " ^ ") : " ^ string_of_pear_type ty
+            "(" ^ " " ^ string_of_typed_tree tree1 ^ " $ " ^ string_of_typed_tree tree2 ^ " " ^ ") : " ^ string_of_silver_type ty
         }
         | Function_definition ty tu trees => {
-            "{" ^ (string_of_tu tu) ^  " -> " ^ (String.concat "; " (List.map string_of_typed_tree trees)) ^ "} : " ^ string_of_pear_type ty
+            "{" ^ (string_of_tu tu) ^  " -> " ^ (String.concat "; " (List.map string_of_typed_tree trees)) ^ "} : " ^ string_of_silver_type ty
         }
     }
 };
@@ -117,32 +117,32 @@ let rec convert_to_typed_tree table tree => {
     };
 
     switch tree {
-        | Pear_parse.Symbol (token, position) => {
+        | Silver_parse.Symbol (token, position) => {
 
             /* Symbols have a single token - each of which
              * is associated with a type
              */
             switch token {
-                | Pear_token.Identifier str => {
+                | Silver_token.Identifier str => {
                     Symbol{
-                        pear_type: (infer_literal_type table str),
+                        silver_type: (infer_literal_type table str),
                         position: position,
                         data: str,
                     }
                 }
-                | Pear_token.String_literal str => {
+                | Silver_token.String_literal str => {
                     Symbol {
-                        pear_type: String,
+                        silver_type: String,
                         position: position,
                         data: str,
                     }
                 }
-                |  _ => raise (Pear_bug (Printf.sprintf
+                |  _ => raise (Silver_bug (Printf.sprintf
                                             "cannot type-infer with token %s"
-                                            (Pear_token.string_of_token token)) position)
+                                            (Silver_token.string_of_token token)) position)
             }
         }
-        | Pear_parse.Call_list abstract_trees => {
+        | Silver_parse.Call_list abstract_trees => {
 
             /* this will turn `(2 3 4 5 6)` into
              * `(2 (3 (4 (5 6))))` */
@@ -165,7 +165,7 @@ let rec convert_to_typed_tree table tree => {
             };
             handle_call_list (List.rev abstract_trees)
         }
-        | Pear_parse.Lambda_list arguments abstract_trees => {
+        | Silver_parse.Lambda_list arguments abstract_trees => {
             switch (List.hd arguments) {
                 | Symbol (token, position) => {
                     switch token {
@@ -177,7 +177,7 @@ let rec convert_to_typed_tree table tree => {
                                 Function_definition
                                     (generic_type ())
                                     {
-                                        pear_type: type_of_argument,
+                                        silver_type: type_of_argument,
                                         position: position,
                                         data: data,
                                     }
@@ -186,34 +186,34 @@ let rec convert_to_typed_tree table tree => {
                                 Function_definition
                                     (generic_type ())
                                     {
-                                        pear_type: type_of_argument,
+                                        silver_type: type_of_argument,
                                         position: position,
                                         data: data,
                                     }
                                     [
-                                        convert_to_typed_tree table (Pear_parse.Lambda_list (List.tl arguments) abstract_trees)
+                                        convert_to_typed_tree table (Silver_parse.Lambda_list (List.tl arguments) abstract_trees)
                                     ]
                             }
                         }
-                        | _ => raise (Pear_utils.Pear_error
+                        | _ => raise (Silver_utils.Silver_error
                                       (Printf.sprintf
                                            "found token %s, which is not an identifier, \
                                            as an argument to a function definition"
-                                           (Pear_token.string_of_token token))
+                                           (Silver_token.string_of_token token))
                                       position)
                     }
                 }
-                | false_argument => raise (Pear_utils.Pear_error
+                | false_argument => raise (Silver_utils.Silver_error
                                             (Printf.sprintf
                                                 "found tee %s, which is not an identifier, \
                                                 as an argumnt to a function definition"
-                                                (Pear_parse.string_of_abstract_tree false_argument))
+                                                (Silver_parse.string_of_abstract_tree false_argument))
                                             {line: -1, column: -1})
                 | exception (Failure "hd") => {
                     Function_definition
                         (Function Unit (generic_type ()))
                         {
-                            pear_type: Unit,
+                            silver_type: Unit,
                             position: {line: -1, column: -1},
                             data: "", /* it's a unit */
                         }
@@ -221,11 +221,11 @@ let rec convert_to_typed_tree table tree => {
                 }
             }
         }
-        | Pear_parse.Sequence_list trees => {
+        | Silver_parse.Sequence_list trees => {
             Function_call Unit
-                (convert_to_typed_tree table (Pear_parse.Lambda_list [] trees))
+                (convert_to_typed_tree table (Silver_parse.Lambda_list [] trees))
                 (Symbol {
-                    pear_type: Unit,
+                    silver_type: Unit,
                     position: {line: -1, column: -1},
                     data: "", /* it's a unit */
                 })
@@ -236,7 +236,7 @@ let rec convert_to_typed_tree table tree => {
 let get_type tree => {
     switch tree {
         | Symbol t_unit => {
-            t_unit.pear_type
+            t_unit.silver_type
         }
         | Function_call a_type function_itself argument => {
             a_type
@@ -249,12 +249,12 @@ let get_type tree => {
 
 let print_constraints constraints =>
     List.map (fun (a, b) => {
-        print_string ("\t" ^ (string_of_pear_type a) ^ " == " ^ (string_of_pear_type b) ^ "\n")
+        print_string ("\t" ^ (string_of_silver_type a) ^ " == " ^ (string_of_silver_type b) ^ "\n")
     }) constraints;
 
 let print_substitutions constraints =>
     List.map (fun (a, b) => {
-        print_string ("\t" ^ string_type_of_int a ^ " == " ^ string_of_pear_type b ^ "\n")
+        print_string ("\t" ^ string_type_of_int a ^ " == " ^ string_of_silver_type b ^ "\n")
     }) constraints;
 
 
@@ -277,7 +277,7 @@ let rec collect_constraints tree : list 'a => {
 
             /* implicit return from a list of expressions */
             let last_argument = List.nth trees (List.length trees - 1);
-            constrain (a_type, Function t_unit.pear_type (get_type last_argument));
+            constrain (a_type, Function t_unit.silver_type (get_type last_argument));
         }
         | Symbol t_unit => ()
     };
@@ -290,12 +290,12 @@ let rec occurs a t => switch t {
     | _ => false;
 };
 
-let rec substitute x replacement pear_type => {
-    switch pear_type {
+let rec substitute x replacement silver_type => {
+    switch silver_type {
         /* actually substitute here */
-        | Generic y => if (x == y) { replacement } else { pear_type }
+        | Generic y => if (x == y) { replacement } else { silver_type }
         | Function a b => Function (substitute x replacement a) (substitute x replacement b)
-        | _ => pear_type
+        | _ => silver_type
     }
 };
 
@@ -305,9 +305,9 @@ let apply_to_type substitutions typ => {
 
 let apply_to_tree substitutions tree => {
 
-    let apply_typed_unit {pear_type, position, data} (x, typ) => {
+    let apply_typed_unit {silver_type, position, data} (x, typ) => {
         {
-            pear_type: substitute x typ pear_type,
+            silver_type: substitute x typ silver_type,
             position,
             data,
         }
@@ -343,7 +343,7 @@ let rec unify constraints => {
             | (Function a b, Function c d) => unify [(a, c), (b, d)];
             | (Function a b as z, Generic x) | (Generic x, Function a b as z) =>
                if (occurs x z) {
-                    raise (Pear_utils.empty_pear_bug "not unifiable - circularity")
+                    raise (Silver_utils.empty_silver_bug "not unifiable - circularity")
                } else {
                     [(x, z)]
                };
@@ -384,7 +384,7 @@ let infer_all tree respect_outer => {
 
             (tree, constraints, treetype)
         }
-        | _ => raise (Pear_utils.empty_pear_bug "the way it's set up this won't happen")
+        | _ => raise (Silver_utils.empty_silver_bug "the way it's set up this won't happen")
     }
 };
 

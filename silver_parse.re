@@ -1,7 +1,7 @@
-/* pear parse */
+/* silver parse */
 
-open Pear_utils;
-open Pear_token;
+open Silver_utils;
+open Silver_token;
 
 /*
 
@@ -37,12 +37,12 @@ let rec string_of_abstract_tree tree => {
   let output = ref "";
 
   let add_string s => output := !output ^ s;
-  let add_char c => add_string (Pear_utils.string_of_char c);
+  let add_char c => add_string (Silver_utils.string_of_char c);
     
   switch tree {
     | Symbol (token, _) => {
       add_char ' ';
-      add_string (Pear_token.string_of_token token);
+      add_string (Silver_token.string_of_token token);
       add_char ' ';
     }
     | Call_list list_of_trees => {
@@ -96,9 +96,9 @@ let parse stream => {
 
     let iterate => Stream.iter (fun item => {
       switch item {
-        | (Pear_token.Left_round, _) =>
+        | (Silver_token.Left_round, _) =>
           add_to_output (Call_list (add_parentheses ()));
-        | (Pear_token.Right_round, _) => raise Stop_iteration;
+        | (Silver_token.Right_round, _) => raise Stop_iteration;
         | data => add_to_output (Symbol data)
       }
     }) stream;
@@ -125,23 +125,23 @@ let parse stream => {
 
     let iterate => Stream.iter (fun tree => {
       switch tree {
-        | Symbol (Pear_token.Left_curly, _) =>
+        | Symbol (Silver_token.Left_curly, _) =>
           add_to outgoing_item (Sequence_list (add_sequences stream));
-        | Symbol (Pear_token.Right_curly, _) => {
+        | Symbol (Silver_token.Right_curly, _) => {
           next_item ();
           raise Stop_iteration;
         }
-        | Symbol (Pear_token.Newline, _) => {
+        | Symbol (Silver_token.Newline, _) => {
           next_item ();
         }
         | Symbol data => add_to outgoing_item (Symbol data);
         | Call_list trees => add_to outgoing_item (Call_list (add_sequences (Stream.of_list trees)));
         | Sequence_list _ =>
-          raise (Pear_utils.Pear_bug
+          raise (Silver_utils.Silver_bug
             "there shouldn't be sequences at this stage"
             {line: -1, column: -1});
         | Lambda_list _ _ =>
-          raise (Pear_utils.Pear_bug
+          raise (Silver_utils.Silver_bug
             "there shouldn't be lambdas at this stage"
             {line: -1, column: -1});
       }
@@ -163,12 +163,12 @@ let parse stream => {
 
     List.iter (fun tree => {
       switch tree {
-        | Symbol (Pear_token.Space, _) => ();
+        | Symbol (Silver_token.Space, _) => ();
         | Symbol data => add_to output (Symbol data);
         | Call_list trees => add_to output (Call_list (remove_spaces trees));
         | Sequence_list trees => add_to output (Sequence_list (remove_spaces trees));
         | Lambda_list _ _ =>
-          raise (Pear_utils.Pear_bug
+          raise (Silver_utils.Silver_bug
             "there shouldn't be lambdas at this stage"
             {line: -1, column: -1});
       }
@@ -214,7 +214,7 @@ let parse stream => {
         switch (List.hd list) {
           /* the exception is caught later and
              interpreted as false */
-          | Symbol (Pear_token.Colon, _) => 0;
+          | Symbol (Silver_token.Colon, _) => 0;
           | _ => find_index (List.tl list) + 1;
         }
       };
@@ -230,11 +230,11 @@ let parse stream => {
     let transform_lambda trees index => {
       let arguments = switch (List.hd trees) {
         | Call_list arguments => arguments;
-        | _ => raise (Pear_bug
+        | _ => raise (Silver_bug
             "arguments to a lambda should always be a call_list"
             {line: -1, column: -1});
       };
-      let (first_arguments, second_arguments) = Pear_utils.split_at index arguments;
+      let (first_arguments, second_arguments) = Silver_utils.split_at index arguments;
 
       /* get rid of the colon */
       let second_arguments = List.tl second_arguments;
@@ -255,7 +255,7 @@ let parse stream => {
         Call_list trees
       }
       | Lambda_list first_trees second_trees =>
-          raise (Pear_utils.Pear_bug
+          raise (Silver_utils.Silver_bug
             "there shouldn't be lambdas at this stage"
             {line: -1, column: -1});
       /* { */

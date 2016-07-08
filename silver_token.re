@@ -1,6 +1,6 @@
-/* pear token */
+/* silver token */
 
-open Pear_utils;
+open Silver_utils;
 
 type token
   = Identifier of string
@@ -63,7 +63,7 @@ let token stream => {
 
   let advance_character = next_character_generator position stream;
 
-  let error_with_position desc => raise (Pear_utils.Pear_error desc !position);
+  let error_with_position desc => raise (Silver_utils.Silver_error desc !position);
 
   let rec read_string quote => {
     let starting_position = !position;
@@ -71,11 +71,11 @@ let token stream => {
       | Some c when c == quote => { "" } ;
       | Some c => {
         advance_character ();
-        switch (Pear_utils.string_of_char c ^ read_string quote) {
+        switch (Silver_utils.string_of_char c ^ read_string quote) {
           | s => s;
           /* This catches exceptions and rethrows them with the proper position */
-          | exception Pear_utils.Pear_error desc pos => {
-            raise (Pear_utils.Pear_error desc starting_position)
+          | exception Silver_utils.Silver_error desc pos => {
+            raise (Silver_utils.Silver_error desc starting_position)
           }
         }
       }
@@ -87,7 +87,7 @@ let token stream => {
     switch (Stream.peek stream) {
       | None => "";
       | Some c when is_split_char c => "" ;
-      | Some c => { advance_character () ; Pear_utils.string_of_char c ^ read_identifier () };
+      | Some c => { advance_character () ; Silver_utils.string_of_char c ^ read_identifier () };
     }
   };
 

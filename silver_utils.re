@@ -1,4 +1,4 @@
-/* pear utils */
+/* silver utils */
 
 
 type position = {
@@ -23,24 +23,24 @@ let rec split_at index list => {
   }
 };
 
-exception Pear_error of string position;
+exception Silver_error of string position;
 
-exception Pear_bug of string position;
+exception Silver_bug of string position;
 
-let empty_pear_bug str => {
-    Pear_bug str {line: -1, column: -1}
+let empty_silver_bug str => {
+    Silver_bug str {line: -1, column: -1}
 };
 
-let empty_pear_error str => {
-    Pear_error str {line: -1, column: -1}
+let empty_silver_error str => {
+    Silver_error str {line: -1, column: -1}
 };
 
-let print_pear_error error => {
+let print_silver_error error => {
   switch error {
-    | Pear_error desc pos => {
+    | Silver_error desc pos => {
       Printf.printf "line:%d, column:%d\n  %s\n" pos.line pos.column desc;
     }
-    | Pear_bug desc pos => {
+    | Silver_bug desc pos => {
       Printf.printf "INTERNAL COMPILER ERROR\nline:%d, column:%d\n  %s\n" pos.line pos.column desc;
     }
     | _ => ();

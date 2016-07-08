@@ -1,10 +1,10 @@
 # makefile
 
 test: build
-	pear_test=all ./pear.native
+	silver_test=all ./silver.native
 
 run: build
-	./pear.native
+	./silver.native
 
 build:
-	rebuild pear.native -pkg str
+	rebuild silver.native -pkg str
