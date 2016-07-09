@@ -2,6 +2,8 @@
 
 open Silver_utils;
 
+open Silver_parse;
+
 /* These three types make up all possible types in silver */
 type attribute = (string, silver_type)
 and small_type =
