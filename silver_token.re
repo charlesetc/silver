@@ -13,7 +13,8 @@ type token =
   | Dot
   | Newline
   | Colon
-  | Space;
+  | Space
+  | Unit;
 
 let string_of_token tokens =>
   switch tokens {
@@ -28,6 +29,8 @@ let string_of_token tokens =>
   | Dot_literal s => "." ^ s
   | String_literal s => "\"" ^ s ^ "\""
   | Newline => "newline"
+  | Unit => "()"
+  | _ => "<unknown token!>"
   };
 
 let is_split_char c => {

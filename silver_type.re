@@ -2,6 +2,8 @@
 
 open Silver_utils;
 
+open Silver_token;
+
 open Silver_parse;
 
 /* These three types make up all possible types in silver */
@@ -18,19 +20,60 @@ type generic_silver_tree 'a =
 /* This is a concrete tree without type parameters */
 type silver_tree = generic_silver_tree (string, Silver_utils.position);
 
+let rec string_of_silver_tree tree =>
+  switch tree {
+  | Symbol _ (a, _) => Silver_token.string_of_token a
+  | Function_def _ argument body =>
+    "{ " ^
+      string_of_silver_tree argument ^
+      " : " ^
+      String.concat "; " (List.map string_of_silver_tree body) ^
+      "}"
+  | Function_app _ argument ret =>
+    "(" ^ string_of_silver_tree argument ^ " " ^ string_of_silver_tree ret ^ ")"
+  };
+
 let convert_to_silver_tree abstract_tree => {
-  let starting_table = Hashtbl.create 16; /* 16 is an arbirtrary number */
+  /* generate a different generic type each time */
   let symbol_tracker = ref 0;
   let generic_type () => {
     let a = !symbol_tracker;
     symbol_tracker := a + 1;
     Generic a
   };
-  let type_for_symbol s => generic_type ();
-  let rec convert tree symbol_table =>
-    switch tree {
-    | Silver_parse.Symbol s => type_for_symbol s
-    | _ => raise Exit
+  /* this function converts an abstract tree to a silver tree (with types) */
+  let unit_token = Symbol (Concrete Unit) (Silver_token.Unit, {line: 0, column: 0});
+  let rec initial_to_silver abstract_tree =>
+    switch abstract_tree {
+    | Silver_parse.Symbol s => Symbol (generic_type ()) s
+    | Silver_parse.Call_list lst =>
+      switch (List.length lst) {
+      | 0
+      | 1 => raise (Silver_utils.empty_silver_bug "a call list cannot have 0 or 1 argument(s)!")
+      | 2 =>
+        Function_app
+          (generic_type ()) (initial_to_silver (List.hd lst)) (initial_to_silver (List.nth lst 1))
+      | _ =>
+        Function_app
+          (generic_type ())
+          (initial_to_silver (List.hd lst))
+          (initial_to_silver (Silver_parse.Call_list (List.tl lst)))
+      }
+    | Silver_parse.Lambda_list arguments body =>
+      switch (List.length arguments) {
+      | 0 => Function_def (generic_type ()) unit_token (List.map initial_to_silver body)
+      | 1 =>
+        Function_def
+          (generic_type ())
+          (initial_to_silver (List.hd arguments))
+          (List.map initial_to_silver body)
+      | _ =>
+        Function_def
+          (generic_type ())
+          (initial_to_silver (List.hd arguments))
+          [initial_to_silver (Silver_parse.Call_list (List.tl body))]
+      }
+    | Silver_parse.Sequence_list body => initial_to_silver (Silver_parse.Lambda_list [] body)
     };
-  convert abstract_tree starting_table
+  initial_to_silver abstract_tree
 };
