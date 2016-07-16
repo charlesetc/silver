@@ -18,7 +18,7 @@ type generic_silver_tree 'a =
   | Function_app of silver_type (generic_silver_tree 'a) (generic_silver_tree 'a);
 
 /* This is a concrete tree without type parameters */
-type silver_tree = generic_silver_tree (string, Silver_utils.position);
+type silver_tree = generic_silver_tree (Silver_token.token, Silver_utils.position);
 
 let rec string_of_silver_tree tree =>
   switch tree {
@@ -76,6 +76,38 @@ let rec initial_to_silver abstract_tree =>
   | Silver_parse.Sequence_list body => initial_to_silver (Silver_parse.Lambda_list [] body)
   };
 
+let type_of_silver_tree tree =>
+  switch tree {
+  | Symbol silver_type _ => silver_type
+  | Function_app silver_type argument action => silver_type
+  | Function_def silver_type argument body => silver_type
+  };
+
+let rec map_over_tree fapp fdef fsymbol (tree: silver_tree) =>
+  switch tree {
+  | Function_app silver_type argument action =>
+    let this_round =
+      switch fapp {
+      | None => []
+      | Some f => f silver_type argument action
+      };
+    List.append
+      (List.concat (List.map (map_over_tree fapp fdef fsymbol) [argument, action])) this_round
+  | Function_def silver_type argument body =>
+    let this_round =
+      switch fdef {
+      | None => []
+      | Some f => f silver_type argument body
+      };
+    List.append (List.concat (List.map (map_over_tree fapp fdef fsymbol) body)) this_round
+  | Symbol silver_tree a =>
+    switch fsymbol {
+    | None => []
+    | Some f => f silver_tree a
+    }
+  };
+
+/* This can be beautified in some way */
 let constrain_function_bindings constraints silver_tree => {
   let rec apply_bindings_to_tree constraints table silver_tree =>
     switch silver_tree {
@@ -97,13 +129,49 @@ let constrain_function_bindings constraints silver_tree => {
       };
       List.append
         constraints (List.concat (List.map (apply_bindings_to_tree constraints table) body))
+    | Symbol _ _ => constraints /* ignore anything that's not an identifier - it is handled elsewhere */
     };
   apply_bindings_to_tree constraints (Hashtbl.create 16) silver_tree /* 16 is arbitrary */
 };
+
+let constrain_function_calls =
+  map_over_tree
+    (
+      Some (
+        fun silver_type argument action => [
+          (
+            type_of_silver_tree action,
+            Concrete (Function (type_of_silver_tree argument) silver_type)
+          )
+        ]
+      )
+    )
+    None
+    None;
+
+let constrain_function_definitions =
+  map_over_tree
+    None
+    (
+      Some (
+        fun silver_type argument body => [
+          (
+            silver_type,
+            Concrete (
+              Function
+                (type_of_silver_tree argument) (type_of_silver_tree (Silver_utils.last_of body))
+            )
+          )
+        ]
+      )
+    )
+    None;
 
 let convert_to_silver_tree abstract_tree => {
   let silver_tree = initial_to_silver abstract_tree;
   let constraints = [];
   let constraints = constrain_function_bindings constraints silver_tree;
+  let constraints = List.append constraints (constrain_function_calls silver_tree);
+  let constraints = List.append constraints (constrain_function_definitions silver_tree);
   silver_tree
 };

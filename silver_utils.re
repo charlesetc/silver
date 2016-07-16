@@ -10,6 +10,8 @@ let list_of_string string => {
   !lst
 };
 
+let last_of list => List.nth list (List.length list - 1);
+
 let rec split_at index list =>
   if (index == 0) {
     ([], list)
