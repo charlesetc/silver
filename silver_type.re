@@ -41,7 +41,7 @@ let rec string_of_silver_type silver_type =>
   switch silver_type {
   | Unit => "unit"
   | Generic i => Silver_utils.string_type_of_int i
-  | Function arg ret => "{ " ^ string_of_silver_type arg ^ " : " ^ string_of_silver_type ret ^ " }"
+  | Function arg ret => "(" ^ string_of_silver_type arg ^ "->" ^ string_of_silver_type ret ^ ")"
   | Integer => "int"
   | Float => "float"
   | Object _ => "object"
@@ -50,15 +50,22 @@ let rec string_of_silver_type silver_type =>
 
 let rec string_of_silver_tree tree =>
   switch tree {
-  | Symbol _ (a, _) => Silver_token.string_of_token a
-  | Function_def _ argument body =>
+  | Symbol silver_type (a, _) =>
+    Silver_token.string_of_token a ^ "::" ^ string_of_silver_type silver_type
+  | Function_def silver_type argument body =>
     "{ " ^
       string_of_silver_tree argument ^
       " : " ^
       String.concat "; " (List.map string_of_silver_tree body) ^
-      "}"
-  | Function_app _ argument ret =>
-    "(" ^ string_of_silver_tree argument ^ " " ^ string_of_silver_tree ret ^ ")"
+      "}::" ^
+      string_of_silver_type silver_type
+  | Function_app silver_type argument ret =>
+    "(" ^
+      string_of_silver_tree argument ^
+      " " ^
+      string_of_silver_tree ret ^
+      ")::" ^
+      string_of_silver_type silver_type
   };
 
 /* generate a different generic type each time */
@@ -285,6 +292,23 @@ and unify_one type_1 type_2 =>
   | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
   };
 
+let rec map_over_type function_for_type silver_tree =>
+  switch silver_tree {
+  | Function_app silver_type arg ret =>
+    Function_app
+      (function_for_type silver_type)
+      (map_over_type function_for_type arg)
+      (map_over_type function_for_type ret)
+  | Function_def silver_type arg body =>
+    Function_def
+      (function_for_type silver_type)
+      (map_over_type function_for_type arg)
+      (List.map (map_over_type function_for_type) body)
+  | Symbol silver_type a => Symbol (function_for_type silver_type) a
+  };
+
+let apply_to_tree substitutions silver_tree => map_over_type (apply substitutions) silver_tree;
+
 let convert_to_silver_tree abstract_tree => {
   let silver_tree = initial_to_silver abstract_tree;
   let constraints = [];
@@ -292,10 +316,6 @@ let convert_to_silver_tree abstract_tree => {
   let constraints = List.append constraints (constrain_function_calls silver_tree);
   let constraints = List.append constraints (constrain_function_definitions silver_tree);
   let substitutions = unify constraints;
-  let silver_type = type_of_silver_tree silver_tree;
-  let silver_type = apply substitutions silver_type;
-  print_string "type:\n\t";
-  print_string (string_of_silver_type silver_type);
-  print_string "\n\n";
+  let silver_tree = apply_to_tree substitutions silver_tree;
   silver_tree
 };
