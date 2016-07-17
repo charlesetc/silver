@@ -252,7 +252,9 @@ let apply (subs: list substitution) silver_type :silver_type => {
     | Unit => Unit
     | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
     };
-  List.fold_right (fun {id, silver_type} => substitute id silver_type) subs silver_type
+  /* this list.rev solves a bug that was replacing 'c with ('b -> 'a),
+     after 'b had been replaced with 'a; this might return in the future */
+  List.fold_right (fun {id, silver_type} => substitute id silver_type) (List.rev subs) silver_type
 };
 
 /* unify a list of pairs */
@@ -309,12 +311,28 @@ let rec map_over_type function_for_type silver_tree =>
 
 let apply_to_tree substitutions silver_tree => map_over_type (apply substitutions) silver_tree;
 
+let string_of_constraints constraints =>
+  String.concat
+    ""
+    (
+      List.map
+        (
+          fun (t1, t2) =>
+            " - " ^ string_of_silver_type t1 ^ " <=> " ^ string_of_silver_type t2 ^ "\n"
+        )
+        constraints
+    );
+
 let convert_to_silver_tree abstract_tree => {
   let silver_tree = initial_to_silver abstract_tree;
   let constraints = [];
   let constraints = constrain_function_bindings constraints silver_tree;
   let constraints = List.append constraints (constrain_function_calls silver_tree);
   let constraints = List.append constraints (constrain_function_definitions silver_tree);
+  print_string (string_of_silver_tree silver_tree);
+  print_string "\n";
+  print_string (string_of_constraints constraints);
+  print_string "\n";
   let substitutions = unify constraints;
   let silver_tree = apply_to_tree substitutions silver_tree;
   silver_tree

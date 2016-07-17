@@ -14,6 +14,7 @@ open Silver_type;
 
 let main () => {
   let state = "map { b : a 2 }\n";
+  let state = "{ b : b }\n";
   Printf.printf "start:\n\t%s\n" state;
   let state = Stream.of_string state;
   let state = Silver_token.token state;
