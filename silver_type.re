@@ -6,11 +6,26 @@ open Silver_token;
 
 open Silver_parse;
 
+/*
+
+ Table of Contents
+
+ Section 1. Functions for and about Silver Trees (The typed tree used for unification)
+ Section 2. Functions for making constraints which will eventually be unified
+ Section 3. Functions for doing the actual unification
+
+ */
+/* Section 1: Silver Trees */
 /* These three types make up all possible types in silver */
 type attribute = (string, silver_type)
-and small_type =
-  | Unit | Integer | Float | Function of silver_type silver_type | Object of (list attribute)
-and silver_type = | Generic of int | Abstract of small_type | Concrete of small_type;
+and silver_type =
+  | Generic of int
+  | Unit
+  | Function of silver_type silver_type
+  | Integer
+  | Float
+  | Object of (list attribute)
+  | Open_object of (list attribute);
 
 type generic_silver_tree 'a =
   | Symbol of silver_type 'a
@@ -19,6 +34,8 @@ type generic_silver_tree 'a =
 
 /* This is a concrete tree without type parameters */
 type silver_tree = generic_silver_tree (Silver_token.token, Silver_utils.position);
+
+type substitution = {id: int, silver_type: silver_type};
 
 let rec string_of_silver_tree tree =>
   switch tree {
@@ -43,7 +60,7 @@ let generic_type () => {
 };
 
 /* this function converts an abstract tree to a silver tree (with types) */
-let unit_token = Symbol (Concrete Unit) (Silver_token.Unit, {line: 0, column: 0});
+let unit_token = Symbol Unit (Silver_token.Unit, {line: 0, column: 0});
 
 let rec initial_to_silver abstract_tree =>
   switch abstract_tree {
@@ -83,6 +100,7 @@ let type_of_silver_tree tree =>
   | Function_def silver_type argument body => silver_type
   };
 
+/* Section 2: Constraints */
 let rec map_over_tree fapp fdef fsymbol (tree: silver_tree) =>
   switch tree {
   | Function_app silver_type argument action =>
@@ -139,10 +157,7 @@ let constrain_function_calls =
     (
       Some (
         fun silver_type argument action => [
-          (
-            type_of_silver_tree action,
-            Concrete (Function (type_of_silver_tree argument) silver_type)
-          )
+          (type_of_silver_tree action, Function (type_of_silver_tree argument) silver_type)
         ]
       )
     )
@@ -157,15 +172,68 @@ let constrain_function_definitions =
         fun silver_type argument body => [
           (
             silver_type,
-            Concrete (
-              Function
-                (type_of_silver_tree argument) (type_of_silver_tree (Silver_utils.last_of body))
-            )
+            Function
+              (type_of_silver_tree argument) (type_of_silver_tree (Silver_utils.last_of body))
           )
         ]
       )
     )
     None;
+
+/* Section 3: Unification */
+/* apply substitutions to a type */
+let apply (subs: list substitution) silver_type :silver_type => {
+  /* substitute silver_type for all occurences of id in parent_type */
+  let rec substitute id silver_type parent_type =>
+    switch parent_type {
+    | Generic y =>
+      if (id == y) {
+        silver_type
+      } else {
+        parent_type
+      }
+    | Function arg_type ret_type =>
+      Function (substitute id silver_type arg_type) (substitute id silver_type ret_type)
+    | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
+    };
+  List.fold_right (fun {id, silver_type} => substitute id silver_type) subs silver_type
+};
+
+/* unify a list of pairs */
+let rec unify constraints :list substitution =>
+  switch constraints {
+  | [] => []
+  | [(x, y), ...rest] =>
+    let rest_sub = unify rest;
+    let this_sub = unify_one (apply rest_sub x) (apply rest_sub y);
+    List.append rest_sub this_sub
+  }
+/* does id occur in silver_type? */
+and occurs id silver_type =>
+  switch silver_type {
+  | Generic y => y == id
+  | Function arg_type ret_type => occurs id arg_type || occurs id ret_type
+  | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
+  }
+/* unify one pair */
+and unify_one type_1 type_2 =>
+  switch (type_1, type_2) {
+  | (Generic x, Generic y as z) =>
+    if (x == y) {
+      []
+    } else {
+      [{id: x, silver_type: z}]
+    }
+  | (Function arg1 ret1, Function arg2 ret2) => unify [(arg1, arg2), (ret1, ret2)]
+  | (Generic x, Function arg ret as z)
+  | (Function arg ret as z, Generic x) =>
+    if (occurs x z) {
+      raise (Silver_utils.empty_silver_error "not unifiable: circularity")
+    } else {
+      [{id: x, silver_type: z}]
+    }
+  | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
+  };
 
 let convert_to_silver_tree abstract_tree => {
   let silver_tree = initial_to_silver abstract_tree;
