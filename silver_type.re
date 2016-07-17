@@ -87,12 +87,12 @@ let rec initial_to_silver abstract_tree =>
   | Silver_parse.Symbol s => Symbol (generic_type ()) s
   | Silver_parse.Call_list lst =>
     switch (List.length lst) {
-    | 0
-    | 1 => raise (Silver_utils.empty_silver_bug "a call list cannot have 0 or 1 argument(s)!")
+    | 0 => raise (Silver_utils.empty_silver_bug "a call list cannot have 0 arguments!")
+    | 1 => initial_to_silver (List.hd lst)
     | 2 =>
       Function_app
         (generic_type ()) (initial_to_silver (List.hd lst)) (initial_to_silver (List.nth lst 1))
-    | _ =>
+    | n =>
       Function_app
         (generic_type ())
         (initial_to_silver (List.hd lst))
@@ -108,7 +108,17 @@ let rec initial_to_silver abstract_tree =>
       Function_def
         (generic_type ())
         (initial_to_silver (List.hd arguments))
-        [initial_to_silver (Silver_parse.Call_list (List.tl body))]
+        [
+          initial_to_silver (
+            switch (List.length body) {
+            | 0 =>
+              raise (
+                Silver_utils.empty_silver_bug "a function definition needs at least one item in body"
+              )
+            | n => Silver_parse.Lambda_list (List.tl arguments) body
+            }
+          )
+        ]
     }
   | Silver_parse.Sequence_list body => initial_to_silver (Silver_parse.Lambda_list [] body)
   };
@@ -249,6 +259,24 @@ let string_of_constraints constraints =>
         constraints
     );
 
+let constrain_integer_types =
+  map_over_tree
+    None
+    None
+    (
+      Some (
+        fun silver_type (token, position) =>
+          switch token {
+          | Identifier data =>
+            switch (int_of_string data) {
+            | i => [(silver_type, Integer)]
+            | exception Failure "int_of_string" => []
+            }
+          | _ => []
+          }
+      )
+    );
+
 /* Section 3: Unification */
 /* apply substitutions to a type */
 let apply (subs: list substitution) silver_type :silver_type => {
@@ -263,7 +291,8 @@ let apply (subs: list substitution) silver_type :silver_type => {
       }
     | Function arg_type ret_type =>
       Function (substitute id silver_type arg_type) (substitute id silver_type ret_type)
-    | Unit => Unit
+    | Unit => Unit /* don't substitute anything */
+    | Integer => Integer /* don't substitute anything */
     | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
     };
   /* this list.rev solves a bug that was replacing 'c with ('b -> 'a),
@@ -286,18 +315,25 @@ and occurs id silver_type =>
   | Generic y => y == id
   | Function arg_type ret_type => occurs id arg_type || occurs id ret_type
   | Unit => false
+  | Integer => false
   | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
   }
 /* unify one pair */
 and unify_one type_1 type_2 =>
   switch (type_1, type_2) {
+  /*
+   * Generic <=> Generic */
   | (Generic x, Generic y as z) =>
     if (x == y) {
       []
     } else {
       [{id: x, silver_type: z}]
     }
+  /*
+   * Function <=> Function */
   | (Function arg1 ret1, Function arg2 ret2) => unify [(arg1, arg2), (ret1, ret2)]
+  /*
+   * Generic <=> Function */
   | (Generic x, Function arg ret as z)
   | (Function arg ret as z, Generic x) =>
     if (occurs x z) {
@@ -305,6 +341,12 @@ and unify_one type_1 type_2 =>
     } else {
       [{id: x, silver_type: z}]
     }
+  /*
+   * Integer <=> Generic */
+  | (Generic x, Integer)
+  | (Integer, Generic x) => [{id: x, silver_type: Integer}]
+  /*
+   * Anything else is an error */
   | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
   };
 
@@ -331,10 +373,7 @@ let convert_to_silver_tree abstract_tree => {
   let constraints = constrain_function_bindings constraints silver_tree;
   let constraints = List.append constraints (constrain_function_calls silver_tree);
   let constraints = List.append constraints (constrain_function_definitions silver_tree);
-  /* print_string (string_of_silver_tree silver_tree); */
-  /* print_string "\n"; */
-  /* print_string (string_of_constraints constraints); */
-  /* print_string "\n"; */
+  let constraints = List.append constraints (constrain_integer_types silver_tree);
   let substitutions = unify constraints;
   let silver_tree = apply_to_tree substitutions silver_tree;
   (silver_tree, constraints)

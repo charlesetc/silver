@@ -13,13 +13,18 @@ open Silver_parse;
 open Silver_type;
 
 let main () => {
-  let state = "a b";
+  /* let state = "{ a b : b 2 ; a b}"; */
+  let state = "{a b : c}";
   Printf.printf "start:\n\t%s\n" state;
   let state = Stream.of_string state;
   let state = Silver_token.token state;
   let state = Silver_balance.balance state;
   let state = Silver_parse.parse state;
-  let (state, _) = Silver_type.convert_to_silver_tree state;
+  /* print_string (Silver_parse.string_of_abstract_tree state); */
+  let (state, constraints) = Silver_type.convert_to_silver_tree state;
+  /* print_string "constraints:\n"; */
+  /* print_string (Silver_type.string_of_constraints constraints); */
+  print_string "\n";
   print_string "silver:\n\t";
   print_string (string_of_silver_tree state)
 };
