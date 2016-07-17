@@ -71,6 +71,8 @@ let rec string_of_silver_tree tree =>
 /* generate a different generic type each time */
 let symbol_tracker = ref 0;
 
+let reset_count () => symbol_tracker := 0;
+
 let generic_type () => {
   let a = !symbol_tracker;
   symbol_tracker := a + 1;
@@ -114,21 +116,21 @@ let rec initial_to_silver abstract_tree =>
 let type_of_silver_tree tree =>
   switch tree {
   | Symbol silver_type _ => silver_type
-  | Function_app silver_type argument action => silver_type
+  | Function_app silver_type action argument => silver_type
   | Function_def silver_type argument body => silver_type
   };
 
 /* Section 2: Constraints */
 let rec map_over_tree fapp fdef fsymbol (tree: silver_tree) =>
   switch tree {
-  | Function_app silver_type argument action =>
+  | Function_app silver_type action argument =>
     let this_round =
       switch fapp {
       | None => []
-      | Some f => f silver_type argument action
+      | Some f => f silver_type action argument
       };
     List.append
-      (List.concat (List.map (map_over_tree fapp fdef fsymbol) [argument, action])) this_round
+      (List.concat (List.map (map_over_tree fapp fdef fsymbol) [action, argument])) this_round
   | Function_def silver_type argument body =>
     let (this_round, callback) =
       switch fdef {
@@ -203,7 +205,7 @@ let constrain_function_calls =
     /* function app */
     (
       Some (
-        fun silver_type argument action => [
+        fun silver_type action argument => [
           (type_of_silver_tree action, Function (type_of_silver_tree argument) silver_type)
         ]
       )
@@ -234,6 +236,18 @@ let constrain_function_definitions =
     )
     /* symbol */
     None;
+
+let string_of_constraints constraints =>
+  String.concat
+    ""
+    (
+      List.map
+        (
+          fun (t1, t2) =>
+            " - " ^ string_of_silver_type t1 ^ " <=> " ^ string_of_silver_type t2 ^ "\n"
+        )
+        constraints
+    );
 
 /* Section 3: Unification */
 /* apply substitutions to a type */
@@ -311,29 +325,17 @@ let rec map_over_type function_for_type silver_tree =>
 
 let apply_to_tree substitutions silver_tree => map_over_type (apply substitutions) silver_tree;
 
-let string_of_constraints constraints =>
-  String.concat
-    ""
-    (
-      List.map
-        (
-          fun (t1, t2) =>
-            " - " ^ string_of_silver_type t1 ^ " <=> " ^ string_of_silver_type t2 ^ "\n"
-        )
-        constraints
-    );
-
 let convert_to_silver_tree abstract_tree => {
   let silver_tree = initial_to_silver abstract_tree;
   let constraints = [];
   let constraints = constrain_function_bindings constraints silver_tree;
   let constraints = List.append constraints (constrain_function_calls silver_tree);
   let constraints = List.append constraints (constrain_function_definitions silver_tree);
-  print_string (string_of_silver_tree silver_tree);
-  print_string "\n";
-  print_string (string_of_constraints constraints);
-  print_string "\n";
+  /* print_string (string_of_silver_tree silver_tree); */
+  /* print_string "\n"; */
+  /* print_string (string_of_constraints constraints); */
+  /* print_string "\n"; */
   let substitutions = unify constraints;
   let silver_tree = apply_to_tree substitutions silver_tree;
-  silver_tree
+  (silver_tree, constraints)
 };

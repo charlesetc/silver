@@ -138,7 +138,7 @@ let test_basic_parsing () => {
   assert_parsed "{ hi: there }\n{ hi: there }" "{{lambda :hi of :there;};{lambda :hi of :there;};}"
 };
 
-let test_type_inference () => {
+let test_old_type_inference () => {
   let assert_typed string expected => {
     let state = Stream.of_string string;
     let state = Silver_token.token state;
@@ -163,6 +163,30 @@ let test_type_inference () => {
   assert_typed "{x : x a}" "(('b=>'c)=>'c)";
   assert_typed "{x : a c ; x a}" "((('b=>'d)=>'e)=>'e)";
   assert_typed "{x : x 1 2 3}" "((int=>(int=>(int=>'d)))=>'d)"
+};
+
+let test_type_inference () => {
+  let assert_typed string expected => {
+    let state = Stream.of_string string;
+    let state = Silver_token.token state;
+    let state = Silver_balance.balance state;
+    let state = Silver_parse.parse state;
+    let (silver_tree, constraints) = Silver_type.convert_to_silver_tree state;
+    Silver_type.reset_count ();
+    let actual = Silver_type.string_of_silver_type (Silver_type.type_of_silver_tree silver_tree);
+    let actual = remove_from_string ' ' actual;
+    let expected = remove_from_string ' ' expected;
+    switch (assert (actual == expected)) {
+    | _ => print_success ()
+    | exception Assert_failure _ =>
+      print_string (Silver_type.string_of_constraints constraints);
+      print_string (Silver_type.string_of_silver_tree silver_tree);
+      raise (String_assertion actual expected)
+    }
+  };
+  assert_typed "x" "(unit -> 'a)";
+  assert_typed "{x : x}" "(unit -> ('a -> 'a))";
+  assert_typed "{x : x a}" "(unit -> (('a -> 'c) -> 'c))"
 };
 
 let run_tests_with_regex regex => {
