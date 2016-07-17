@@ -37,6 +37,17 @@ type silver_tree = generic_silver_tree (Silver_token.token, Silver_utils.positio
 
 type substitution = {id: int, silver_type: silver_type};
 
+let rec string_of_silver_type silver_type =>
+  switch silver_type {
+  | Unit => "unit"
+  | Generic i => Silver_utils.string_type_of_int i
+  | Function arg ret => "{ " ^ string_of_silver_type arg ^ " : " ^ string_of_silver_type ret ^ " }"
+  | Integer => "int"
+  | Float => "float"
+  | Object _ => "object"
+  | Open_object _ => "open_object"
+  };
+
 let rec string_of_silver_tree tree =>
   switch tree {
   | Symbol _ (a, _) => Silver_token.string_of_token a
@@ -112,12 +123,20 @@ let rec map_over_tree fapp fdef fsymbol (tree: silver_tree) =>
     List.append
       (List.concat (List.map (map_over_tree fapp fdef fsymbol) [argument, action])) this_round
   | Function_def silver_type argument body =>
-    let this_round =
+    let (this_round, callback) =
       switch fdef {
-      | None => []
+      | None => ([], None)
       | Some f => f silver_type argument body
       };
-    List.append (List.concat (List.map (map_over_tree fapp fdef fsymbol) body)) this_round
+    let constraints =
+      List.append (List.concat (List.map (map_over_tree fapp fdef fsymbol) body)) this_round;
+    /* call the callback if it exists */
+    /* this is for some unfortunate stateful trickery */
+    switch callback {
+    | None => ()
+    | Some f => f ()
+    };
+    constraints
   | Symbol silver_tree a =>
     switch fsymbol {
     | None => []
@@ -125,35 +144,56 @@ let rec map_over_tree fapp fdef fsymbol (tree: silver_tree) =>
     }
   };
 
-/* This can be beautified in some way */
-let constrain_function_bindings constraints silver_tree => {
-  let rec apply_bindings_to_tree constraints table silver_tree =>
-    switch silver_tree {
-    | Symbol silver_type (Identifier ident, position) =>
-      switch (Hashtbl.find table ident) {
-      | a_type => [(a_type, silver_type), ...constraints]
-      }
-    | Function_app silver_type argument action =>
-      List.concat [
-        apply_bindings_to_tree constraints table argument,
-        apply_bindings_to_tree constraints table action,
-        constraints
-      ]
-    | Function_def silver_type argument body =>
-      let table = Hashtbl.copy table;
-      switch argument {
-      | Symbol silver_type (Identifier ident, position) => Hashtbl.add table ident silver_type
-      | _ => ()
-      };
-      List.append
-        constraints (List.concat (List.map (apply_bindings_to_tree constraints table) body))
-    | Symbol _ _ => constraints /* ignore anything that's not an identifier - it is handled elsewhere */
-    };
-  apply_bindings_to_tree constraints (Hashtbl.create 16) silver_tree /* 16 is arbitrary */
+let constrain_function_bindings tree => {
+  let table = Hashtbl.create 16;
+  map_over_tree
+    /* function app */
+    None
+    /* function def */
+    (
+      Some (
+        fun silver_type arg body => {
+          /* add the argument's type to the hashtable */
+          let old_silver_type =
+            switch arg {
+            | Symbol silver_type (Identifier ident, position) =>
+              let old_type_info =
+                switch (Hashtbl.find table ident) {
+                | t => Some (ident, t)
+                | exception Not_found => None
+                };
+              Hashtbl.add table ident silver_type;
+              old_type_info
+            | _ => None
+            };
+          let callback () =>
+            switch old_silver_type {
+            | None => ()
+            | Some (ident, old_type) => Hashtbl.add table ident old_type
+            };
+          ([], Some callback)
+        }
+      )
+    )
+    /* symbol */
+    (
+      Some (
+        fun silver_type (token, position) =>
+          switch token {
+          | Identifier ident =>
+            switch (Hashtbl.find table ident) {
+            | a_type => [(a_type, silver_type)]
+            | exception Not_found => []
+            }
+          | _ => []
+          }
+      )
+    )
 };
 
 let constrain_function_calls =
   map_over_tree
+    /* function app */
     (
       Some (
         fun silver_type argument action => [
@@ -161,23 +201,31 @@ let constrain_function_calls =
         ]
       )
     )
+    /* function def */
     None
+    /* symbol */
     None;
 
 let constrain_function_definitions =
   map_over_tree
+    /* function app */
     None
+    /* function def */
     (
       Some (
-        fun silver_type argument body => [
-          (
-            silver_type,
-            Function
-              (type_of_silver_tree argument) (type_of_silver_tree (Silver_utils.last_of body))
-          )
-        ]
+        fun silver_type argument body => (
+          [
+            (
+              silver_type,
+              Function
+                (type_of_silver_tree argument) (type_of_silver_tree (Silver_utils.last_of body))
+            )
+          ],
+          None
+        )
       )
     )
+    /* symbol */
     None;
 
 /* Section 3: Unification */
@@ -194,6 +242,7 @@ let apply (subs: list substitution) silver_type :silver_type => {
       }
     | Function arg_type ret_type =>
       Function (substitute id silver_type arg_type) (substitute id silver_type ret_type)
+    | Unit => Unit
     | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
     };
   List.fold_right (fun {id, silver_type} => substitute id silver_type) subs silver_type
@@ -213,6 +262,7 @@ and occurs id silver_type =>
   switch silver_type {
   | Generic y => y == id
   | Function arg_type ret_type => occurs id arg_type || occurs id ret_type
+  | Unit => false
   | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
   }
 /* unify one pair */
@@ -241,5 +291,11 @@ let convert_to_silver_tree abstract_tree => {
   let constraints = constrain_function_bindings constraints silver_tree;
   let constraints = List.append constraints (constrain_function_calls silver_tree);
   let constraints = List.append constraints (constrain_function_definitions silver_tree);
+  let substitutions = unify constraints;
+  let silver_type = type_of_silver_tree silver_tree;
+  let silver_type = apply substitutions silver_type;
+  print_string "type:\n\t";
+  print_string (string_of_silver_type silver_type);
+  print_string "\n\n";
   silver_tree
 };

@@ -16,17 +16,6 @@ open Silver_token;
 type silver_type =
   | Unit | Integer | Float | String | Function of silver_type silver_type | Generic of int;
 
-let string_type_of_int i => {
-  let number = i / 26;
-  let append_str =
-    if (number == 0) {
-      ""
-    } else {
-      string_of_int number
-    };
-  "'" ^ string_of_char (Char.chr (i + Char.code 'a')) ^ append_str
-};
-
 let rec string_of_silver_type at =>
   switch at {
   | Unit => "unit"
@@ -34,7 +23,7 @@ let rec string_of_silver_type at =>
   | Float => "float"
   | String => "string"
   | Function a b => "(" ^ string_of_silver_type a ^ "=>" ^ string_of_silver_type b ^ ")"
-  | Generic i => string_type_of_int i
+  | Generic i => Silver_utils.string_type_of_int i
   };
 
 type typed_unit = {silver_type: silver_type, position: Silver_utils.position, data: string};
@@ -237,7 +226,7 @@ let print_substitutions constraints =>
   List.map
     (
       fun (a, b) => print_string (
-        "\t" ^ string_type_of_int a ^ " == " ^ string_of_silver_type b ^ "\n"
+        "\t" ^ Silver_utils.string_type_of_int a ^ " == " ^ string_of_silver_type b ^ "\n"
       )
     )
     constraints;
@@ -324,7 +313,8 @@ let rec unify constraints => {
         [(x, z)]
       }
     | (Generic x, a)
-    | (a, Generic x) => [(x, a)] /* I'm not sure about this */
+    | (a, Generic x) => [(x, a)]
+    /* I'm not sure about this */
     | (a, b) => [] /* or this */
     };
   if (List.length constraints == 0) {

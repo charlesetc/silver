@@ -13,8 +13,8 @@ open Silver_parse;
 open Silver_type;
 
 let main () => {
-  let state = "\nmap { b : a 2 }\n";
-  Printf.printf "start:\n\t%s\n\n" state;
+  let state = "map { b : a 2 }\n";
+  Printf.printf "start:\n\t%s\n" state;
   let state = Stream.of_string state;
   let state = Silver_token.token state;
   let state = Silver_balance.balance state;
@@ -24,6 +24,8 @@ let main () => {
   let str = string_of_silver_tree state;
   print_string str
 };
+
+Printexc.record_backtrace true;
 
 switch (main ()) {
 | _ => ()

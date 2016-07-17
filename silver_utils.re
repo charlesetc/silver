@@ -4,6 +4,17 @@ type position = {line: int, column: int};
 
 let string_of_char = String.make 1;
 
+let string_type_of_int i => {
+  let number = i / 26;
+  let append_str =
+    if (number == 0) {
+      ""
+    } else {
+      string_of_int number
+    };
+  "'" ^ string_of_char (Char.chr (i + Char.code 'a')) ^ append_str
+};
+
 let list_of_string string => {
   let lst = ref [];
   String.iter (fun c => lst := [c, ...!lst]) string;
@@ -33,5 +44,7 @@ let print_silver_error error =>
   | Silver_error desc pos => Printf.printf "line:%d, column:%d\n  %s\n" pos.line pos.column desc
   | Silver_bug desc pos =>
     Printf.printf "INTERNAL COMPILER ERROR\nline:%d, column:%d\n  %s\n" pos.line pos.column desc
-  | _ => ()
+  | _ =>
+    print_string "unknown error:\n";
+    Printexc.print_backtrace stderr
   };
