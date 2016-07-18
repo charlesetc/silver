@@ -95,8 +95,8 @@ let rec initial_to_silver abstract_tree =>
     | n =>
       Function_app
         (generic_type ())
-        (initial_to_silver (List.hd lst))
-        (initial_to_silver (Silver_parse.Call_list (List.tl lst)))
+        (initial_to_silver (Silver_parse.Call_list (Silver_utils.all_but_last_of lst)))
+        (initial_to_silver (Silver_utils.last_of lst))
     }
   | Silver_parse.Lambda_list arguments body =>
     switch (List.length arguments) {
@@ -293,7 +293,7 @@ let apply (subs: list substitution) silver_type :silver_type => {
       Function (substitute id silver_type arg_type) (substitute id silver_type ret_type)
     | Unit => Unit /* don't substitute anything */
     | Integer => Integer /* don't substitute anything */
-    | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
+    | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to substituting these types yet")
     };
   /* this list.rev solves a bug that was replacing 'c with ('b -> 'a),
      after 'b had been replaced with 'a; this might return in the future */
@@ -316,7 +316,8 @@ and occurs id silver_type =>
   | Function arg_type ret_type => occurs id arg_type || occurs id ret_type
   | Unit => false
   | Integer => false
-  | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
+  | _ =>
+    raise (Silver_utils.empty_silver_bug "haven't gotten to defining 'occurs' these types yet")
   }
 /* unify one pair */
 and unify_one type_1 type_2 =>
@@ -345,9 +346,24 @@ and unify_one type_1 type_2 =>
    * Integer <=> Generic */
   | (Generic x, Integer)
   | (Integer, Generic x) => [{id: x, silver_type: Integer}]
+  | (Integer, z)
+  | (z, Integer) =>
+    raise (
+      Silver_utils.empty_silver_error (
+        Printf.sprintf "type integer cannot be unified with type %s" (string_of_silver_type z)
+      )
+    )
   /*
    * Anything else is an error */
-  | _ => raise (Silver_utils.empty_silver_bug "haven't gotten to these types yet")
+  | _ =>
+    raise (
+      Silver_utils.empty_silver_bug (
+        Printf.sprintf
+          "haven't gotten to unifying these types yet: (%s, %s)"
+          (string_of_silver_type type_1)
+          (string_of_silver_type type_2)
+      )
+    )
   };
 
 let rec map_over_type function_for_type silver_tree =>

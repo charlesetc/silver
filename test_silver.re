@@ -138,33 +138,6 @@ let test_basic_parsing () => {
   assert_parsed "{ hi: there }\n{ hi: there }" "{{lambda :hi of :there;};{lambda :hi of :there;};}"
 };
 
-let test_old_type_inference () => {
-  let assert_typed string expected => {
-    let state = Stream.of_string string;
-    let state = Silver_token.token state;
-    let state = Silver_balance.balance state;
-    let state = Silver_parse.parse state;
-    /* don't respect the outer tree */
-    let (tree, constraints, silver_type) = Silver_type_old.infer_all state false;
-    let actual = Silver_type_old.string_of_silver_type silver_type;
-    let expected = remove_from_string ' ' expected;
-    let actual = remove_from_string ' ' actual;
-    Silver_type_old.reset_count ();
-    switch (assert (actual == expected)) {
-    | _ => print_success ()
-    | exception Assert_failure _ =>
-      Silver_type_old.print_constraints constraints;
-      print_string (Silver_type_old.string_of_typed_tree tree);
-      raise (String_assertion actual expected)
-    }
-  };
-  assert_typed "x" "'a";
-  assert_typed "{x : x}" "('a=>'a)";
-  assert_typed "{x : x a}" "(('b=>'c)=>'c)";
-  assert_typed "{x : a c ; x a}" "((('b=>'d)=>'e)=>'e)";
-  assert_typed "{x : x 1 2 3}" "((int=>(int=>(int=>'d)))=>'d)"
-};
-
 let test_type_inference () => {
   let assert_typed string expected => {
     let state = Stream.of_string string;
@@ -186,7 +159,10 @@ let test_type_inference () => {
   };
   assert_typed "x" "(unit -> 'a)";
   assert_typed "{x : x}" "(unit -> ('a -> 'a))";
-  assert_typed "{x : x a}" "(unit -> (('a -> 'c) -> 'c))"
+  assert_typed "{x : x a}" "(unit -> (('a -> 'c) -> 'c))";
+  assert_typed "{x a: a 2; x a}" "(unit -> (((int -> 'c)-> 'f) -> ((int -> 'c) -> 'f)))";
+  assert_typed "{x: x 1}" "(unit-> ((int->'c) -> 'c))";
+  assert_typed "{x: x 1 2 3}" "(unit -> ((int-> (int-> (int -> 'g)))-> 'g))"
 };
 
 let run_tests_with_regex regex => {

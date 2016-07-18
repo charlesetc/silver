@@ -13,7 +13,6 @@ open Silver_parse;
 open Silver_type;
 
 let main () => {
-  /* let state = "{ a b : b 2 ; a b}"; */
   let state = "{a b : c}";
   Printf.printf "start:\n\t%s\n" state;
   let state = Stream.of_string state;

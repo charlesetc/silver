@@ -23,6 +23,14 @@ let list_of_string string => {
 
 let last_of list => List.nth list (List.length list - 1);
 
+/* This should be removed entirely - it's just a short term fix */
+let rec all_but_last_of list =>
+  switch list {
+  | [] => []
+  | [a] => []
+  | [a, ...list] => [a, ...all_but_last_of list]
+  };
+
 let rec split_at index list =>
   if (index == 0) {
     ([], list)
