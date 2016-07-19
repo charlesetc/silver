@@ -1,0 +1,95 @@
+(*
+  Disclaimer
+
+  Nothing here has been implemented at the time of this writing.
+  This is a preliminary description of my plans for the language.
+*)
+
+-- this will be a comment
+(* this is also a comment *)
+-- I chose these because they look nice
+
+square = { a b : a * b }
+
+-- a function call:
+square 2 4 --> 6
+
+-- Like the way that --> was a comment?! me too
+
+-- these are variable bindings
+
+a = 2
+c = 4
+a = c
+
+-- that was not mutation, that was shadowing
+-- this is mutation:
+
+a = ref 2
+a := 3
+
+--# classes
+
+a = {
+-- here is a sequence of actions
+print "hi"
+print "there"
+4
+}
+
+a == 4 --> true
+
+(*
+
+Remember this?
+
+square = { a b : a * b }
+
+There is another way to define functions:
+
+*)
+
+fn square a b {
+  print "I'm squaring things!"
+  a * b
+}
+
+-- semicolons are the same as newlines, btw
+
+;;;;;;;;;;;;;;;;;;;
+
+--# Data Types
+
+-- integer
+2
+
+-- float
+2.0
+
+-- string
+"hi there"
+
+-- list
+[2 3 4 5 6] -- look Ma, no commas!
+
+-- records
+< name: "charles" age: 2 >
+
+--# Classes
+
+class Person name age {
+
+  fn to_string {
+    self.name + " " + age.to_string
+  }
+
+}
+
+charles = Person "charles" 105
+
+print (charles.to_string ())
+
+-- another way to do function application
+print ! charles.name
+
+
