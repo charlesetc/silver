@@ -10,9 +10,12 @@ type token =
   | Right_curly
   | Left_round
   | Right_round
+  | Left_angle
+  | Right_angle
   | Dot
   | Newline
   | Colon
+  | Comma
   | Space
   | Unit;
 
@@ -22,9 +25,12 @@ let string_of_token tokens =>
   | Right_curly => "right curly"
   | Left_round => "left round"
   | Right_round => "right round"
+  | Left_angle => "left angle"
+  | Right_angle => "right angle"
   | Dot => "dot"
   | Space => "space"
   | Colon => "colon"
+  | Comma => "comma"
   | Identifier s => ":" ^ s
   | Dot_literal s => "." ^ s
   | String_literal s => "\"" ^ s ^ "\""
@@ -34,7 +40,7 @@ let string_of_token tokens =>
   };
 
 let is_split_char c => {
-  let split_chars = ":;\"\n'{}(). ";
+  let split_chars = ":;\"\n'{}()<>. ";
   switch (String.index split_chars c) {
   | exception Not_found => false
   | _ => true
@@ -89,8 +95,11 @@ let token stream => {
       | Some '}' => gen_token Right_curly
       | Some '{' => gen_token Left_curly
       | Some ':' => gen_token Colon
+      | Some ',' => gen_token Comma
       | Some ')' => gen_token Right_round
       | Some '(' => gen_token Left_round
+      | Some '>' => gen_token Right_angle
+      | Some '<' => gen_token Left_angle
       | Some '\n' => gen_token Newline
       | Some ';' => gen_token Newline
       | Some ' ' => gen_token Space

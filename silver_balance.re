@@ -6,7 +6,7 @@ open Silver_token;
 
 let balance stream => {
   let stack = Stack.create ();
-  let matched_symbols = [Silver_token.Left_round, Silver_token.Left_curly];
+  let matched_symbols = [Silver_token.Left_round, Silver_token.Left_curly, Silver_token.Left_angle];
   let is_matched_symbol symbol =>
     switch (List.find (fun x => x == symbol) matched_symbols) {
     | exception Not_found => false
@@ -36,10 +36,15 @@ let balance stream => {
   let inner_balance _ => {
     let transparent_return_value = Stream.peek stream;
     switch (Stream.next stream) {
+        /* round */
     | (Silver_token.Right_round, right_position) =>
       ensure Silver_token.Right_round Silver_token.Left_round right_position
+      /* curly */
     | (Silver_token.Right_curly, right_position) =>
       ensure Silver_token.Right_curly Silver_token.Left_curly right_position
+      /* angle */
+    | (Silver_token.Right_angle, right_position) =>
+      ensure Silver_token.Right_angle Silver_token.Left_angle right_position
     | (t, left_position) when is_matched_symbol t => Stack.push (t, left_position) stack
     | _ => ()
     | exception Stream.Failure =>
