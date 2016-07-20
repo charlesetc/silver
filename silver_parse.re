@@ -28,8 +28,6 @@ type abstract_tree 'a =
   /* used for lambdas => { x y : ... ; ... } */
   | Lambda_list of (list (abstract_tree 'a)) (list (abstract_tree 'a));
 
-type parse_function = | Start_with_angle | Parse_value | Parse_key | Parse_comma | Parse_colon;
-
 let add_to o x => o := [x, ...!o];
 
 let bad_add_to o x => o := List.append !o [x];
@@ -143,33 +141,35 @@ let parse stream => {
   let rec add_structs trees => {
     let output = ref [];
     let struct_literal = ref [];
+    let next_function = ref None;
+    let ret f => next_function := Some f;
     let rec start_with_angle tree =>
       switch tree {
       | Symbol (Silver_token.Left_angle, position) =>
         bad_add_to struct_literal (Symbol (Silver_token.Identifier "struct", position));
-        Parse_key
+        ret parse_key
       | Symbol _ as z =>
         bad_add_to output z;
-        Start_with_angle
+        ret start_with_angle
       | Call_list trees =>
         bad_add_to output (Call_list (add_structs trees));
-        Start_with_angle
+        ret start_with_angle
       | Sequence_list trees =>
         bad_add_to output (Sequence_list (add_structs trees));
-        Start_with_angle
+        ret start_with_angle
       | Lambda_list _ _ => raise (Silver_utils.empty_silver_bug "should not have lambdas yet")
       }
     and parse_key tree =>
       switch tree {
       | Symbol (Silver_token.Identifier ident, position) as z =>
         bad_add_to struct_literal z;
-        Parse_colon
+        ret parse_colon
       /* This is an object, but not a valid key */
       | _ => raise (Silver_utils.empty_silver_error "expected an object literal key")
       }
     and parse_colon tree =>
       switch tree {
-      | Symbol (Silver_token.Colon, position) => Parse_value
+      | Symbol (Silver_token.Colon, position) => ret parse_value
       | _ =>
         raise (Silver_utils.empty_silver_error "object literal key should be followed by a colon")
       }
@@ -180,32 +180,28 @@ let parse stream => {
       | Sequence_list trees => bad_add_to struct_literal (Sequence_list (add_structs trees))
       | Lambda_list _ _ => raise (Silver_utils.empty_silver_bug "shouldn't have lambdas yet")
       };
-      Parse_comma
+      ret parse_comma
     }
     and parse_comma tree =>
       switch tree {
       /* skip over commas within objects */
-      | Symbol (Silver_token.Comma, position) => Parse_comma
+      | Symbol (Silver_token.Comma, position) => ret parse_comma
       | Symbol (Silver_token.Right_angle, position) =>
         bad_add_to output (Call_list !struct_literal);
         struct_literal := [];
-        Start_with_angle
+        ret start_with_angle
       | anything_else => parse_key tree
       };
     /* maybe this should be fold right? */
-    List.fold_left
+    List.iter
       (
-        fun f b =>
-          switch f {
-          /* without this mapping, the types would be circular */
-          | Start_with_angle => start_with_angle b
-          | Parse_key => parse_key b
-          | Parse_value => parse_value b
-          | Parse_colon => parse_colon b
-          | Parse_comma => parse_comma b
+        fun x => (
+          switch !next_function {
+          | Some f => f
+          | None => start_with_angle
           }
+        ) x
       )
-      Start_with_angle
       trees;
     !output
   };
