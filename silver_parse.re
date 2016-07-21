@@ -305,15 +305,19 @@ let parse stream => {
     | all => all
     }
   };
+  /* TODO: make list reversing not a problem with this file. */
+  /* Right now it's very ugly and unintelligent - if we had */
+  /* doubly linked lists this would be trivial */
   let state = add_parentheses ();
   let state = remove_spaces state;
   let state = add_sequences (Stream.of_list state);
-  let state = add_structs state;
   let state = Sequence_list state;
-  let state = simplify_single_parentheses state;
-  let state = add_lambdas state;
-  /* incase we added any dumb things... */
-  let state = simplify_single_parentheses state;
   let state = reverse_everything state;
+  let state = List.nth (add_structs [state]) 0;
+  let state = simplify_single_parentheses state;
+  /* incase we added any dumb things... */
+  /* let state = simplify_single_parentheses state; */
+  let state = reverse_everything state;
+  let state = add_lambdas state;
   state
 };

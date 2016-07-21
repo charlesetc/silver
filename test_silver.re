@@ -136,7 +136,7 @@ let test_basic_parsing () => {
   assert_parsed
     "{ hi: there } { hi: there }" "{({lambda :hi of :there;} {lambda :hi of :there;});}";
   assert_parsed "{ hi: there }\n{ hi: there }" "{{lambda :hi of :there;};{lambda :hi of :there;};}";
-  assert_parsed "<>" "object"
+  assert_parsed "<color:blue>" "{(:struct:color:blue);}"
 };
 
 let test_type_inference () => {
