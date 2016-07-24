@@ -32,6 +32,12 @@ let add_to o x => o := [x, ...!o];
 
 let bad_add_to o x => o := List.append !o [x];
 
+let is_dot_tree tree =>
+  switch tree {
+  | Symbol (Dot_literal _, _) => true
+  | _ => false
+  };
+
 let rec string_of_abstract_tree tree => {
   let output = ref "";
   let add_string s => output := !output ^ s;
@@ -78,6 +84,34 @@ let rec string_of_abstract_tree tree => {
     add_string "} "
   };
   !output
+};
+
+let rec add_dot_syntax ast => {
+  /* let switch_method_syntax list => */
+  /*   if (List.length list > 1 && is_dot_tree (List.nth list 1)) { */
+
+  /*     [List.nth list 1, List.nth list 0, ...List.tl @@ List.tl @@ list] */
+  /*   } else { */
+  /*     list */
+  /*   }; */
+  let rec add_dot_calls list => switch list {
+  | [x, y, ...xs] => if (is_dot_tree y) {
+      add_dot_calls ([Call_list [y, x], ...xs])
+  } else {
+      [x, ...add_dot_calls [y, ...xs]]
+  }
+  | xs => xs
+  };
+  switch ast {
+  | Symbol a => Symbol a
+  | Call_list list =>
+    /* let list = switch_method_syntax list; */
+    let list = add_dot_calls list;
+    Call_list (List.map add_dot_syntax list)
+  | Sequence_list list => Sequence_list (List.map add_dot_syntax list)
+  | Lambda_list args body =>
+    Lambda_list (List.map add_dot_syntax args) (List.map add_dot_syntax body)
+  }
 };
 
 let parse stream => {
@@ -319,5 +353,8 @@ let parse stream => {
   /* let state = simplify_single_parentheses state; */
   let state = reverse_everything state;
   let state = add_lambdas state;
+  let state = add_dot_syntax state;
+  let state = simplify_single_parentheses state;
+  let state = reverse_everything state;
   state
 };
