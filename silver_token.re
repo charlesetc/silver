@@ -40,7 +40,7 @@ let string_of_token tokens =>
   };
 
 let is_split_char c => {
-  let split_chars = ":;\"\n'{}()<>. ";
+  let split_chars = ":;\"\n'{}()<>., ";
   switch (String.index split_chars c) {
   | exception Not_found => false
   | _ => true

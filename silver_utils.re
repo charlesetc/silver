@@ -54,5 +54,6 @@ let print_silver_error error =>
     Printf.printf "INTERNAL COMPILER ERROR\nline:%d, column:%d\n  %s\n" pos.line pos.column desc
   | _ =>
     print_string "unknown error:\n";
-    Printexc.print_backtrace stderr
+    Printexc.print_backtrace stderr;
+    raise error
   };

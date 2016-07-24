@@ -32,5 +32,7 @@ Printexc.record_backtrace true;
 
 switch (main ()) {
 | _ => ()
-| exception e => Silver_utils.print_silver_error e
+| exception (Silver_utils.Silver_error _ _ as e) => Silver_utils.print_silver_error e
+| exception (Silver_utils.Silver_bug _ _ as e) => Silver_utils.print_silver_error e
+| exception e => Printexc.print_backtrace stderr;
 };

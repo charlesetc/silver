@@ -87,21 +87,16 @@ let rec string_of_abstract_tree tree => {
 };
 
 let rec add_dot_syntax ast => {
-  /* let switch_method_syntax list => */
-  /*   if (List.length list > 1 && is_dot_tree (List.nth list 1)) { */
-
-  /*     [List.nth list 1, List.nth list 0, ...List.tl @@ List.tl @@ list] */
-  /*   } else { */
-  /*     list */
-  /*   }; */
-  let rec add_dot_calls list => switch list {
-  | [x, y, ...xs] => if (is_dot_tree y) {
-      add_dot_calls ([Call_list [y, x], ...xs])
-  } else {
-      [x, ...add_dot_calls [y, ...xs]]
-  }
-  | xs => xs
-  };
+  let rec add_dot_calls list =>
+    switch list {
+    | [x, y, ...xs] =>
+      if (is_dot_tree y) {
+        add_dot_calls [Call_list [y, x], ...xs]
+      } else {
+        [x, ...add_dot_calls [y, ...xs]]
+      }
+    | xs => xs
+    };
   switch ast {
   | Symbol a => Symbol a
   | Call_list list =>
@@ -135,6 +130,33 @@ let parse stream => {
     };
     !output
   };
+  let rec add_angle_parentheses stream => {
+       let output = ref [];
+         let iterate () =>
+             Stream.iter (
+                 fun tree => switch tree {
+                     | Symbol (Silver_token.Left_angle, position) =>
+                     add_to output (Call_list [Symbol (Silver_token.Identifier "syntax_angle_bracket", position), ...add_angle_parentheses stream])
+                     | Symbol (Silver_token.Right_angle, _) =>
+                         raise Stop_iteration
+                     | Symbol _ => add_to output tree
+                     | Call_list trees =>
+                         add_to output (Call_list (add_angle_parentheses (Stream.of_list trees)))
+                     | Sequence_list trees =>
+                        add_to output (Sequence_list (add_angle_parentheses (Stream.of_list trees)))
+                     | _ =>
+                       raise (Silver_utils.empty_silver_bug "there shouldn't be lambdas at this stage")
+                 }
+             )
+             stream;
+
+         /* uses stop iteration exception as break */
+         switch (iterate ()) {
+         | _ => ()
+         | exception Stop_iteration => ()
+         };
+         List.rev !output
+     };
   let rec add_sequences stream => {
     let output = ref [];
     let outgoing_item = ref [];
@@ -172,72 +194,25 @@ let parse stream => {
     next_item ();
     !output
   };
-  let rec add_structs trees => {
-    let output = ref [];
-    let struct_literal = ref [];
-    let next_function = ref None;
-    let ret f => next_function := Some f;
-    let rec start_with_angle tree =>
+  let rec add_structs tree => {
+      let remove token => List.filter (fun x => switch x {
+          | Symbol (this_token, position) => this_token != token
+          | _ => false
+      });
       switch tree {
-      | Symbol (Silver_token.Left_angle, position) =>
-        bad_add_to struct_literal (Symbol (Silver_token.Identifier "struct", position));
-        ret parse_key
-      | Symbol _ as z =>
-        bad_add_to output z;
-        ret start_with_angle
-      | Call_list trees =>
-        bad_add_to output (Call_list (add_structs trees));
-        ret start_with_angle
-      | Sequence_list trees =>
-        bad_add_to output (Sequence_list (add_structs trees));
-        ret start_with_angle
-      | Lambda_list _ _ => raise (Silver_utils.empty_silver_bug "should not have lambdas yet")
+          | Symbol _ => tree
+          | Call_list [(Symbol (Silver_token.Identifier "syntax_angle_bracket", position)), ...rest] =>
+              let rest = remove Silver_token.Colon rest;
+              let rest = remove Silver_token.Comma rest;
+              Call_list [(Symbol (Silver_token.Identifier "struct", position)), ...rest]
+          | Call_list list => Call_list (List.map add_structs list);
+          | Sequence_list list => Sequence_list (List.map add_structs list);
+          | _ =>
+            raise (
+              Silver_utils.Silver_bug
+                "there shouldn't be lambdas at this stage" {line: (-1), column: (-1)}
+            )
       }
-    and parse_key tree =>
-      switch tree {
-      | Symbol (Silver_token.Identifier ident, position) as z =>
-        bad_add_to struct_literal z;
-        ret parse_colon
-      /* This is an object, but not a valid key */
-      | _ => raise (Silver_utils.empty_silver_error "expected an object literal key")
-      }
-    and parse_colon tree =>
-      switch tree {
-      | Symbol (Silver_token.Colon, position) => ret parse_value
-      | _ =>
-        raise (Silver_utils.empty_silver_error "object literal key should be followed by a colon")
-      }
-    and parse_value tree => {
-      switch tree {
-      | Symbol _ as z => bad_add_to struct_literal z
-      | Call_list trees => bad_add_to struct_literal (Call_list (add_structs trees))
-      | Sequence_list trees => bad_add_to struct_literal (Sequence_list (add_structs trees))
-      | Lambda_list _ _ => raise (Silver_utils.empty_silver_bug "shouldn't have lambdas yet")
-      };
-      ret parse_comma
-    }
-    and parse_comma tree =>
-      switch tree {
-      /* skip over commas within objects */
-      | Symbol (Silver_token.Comma, position) => ret parse_comma
-      | Symbol (Silver_token.Right_angle, position) =>
-        bad_add_to output (Call_list !struct_literal);
-        struct_literal := [];
-        ret start_with_angle
-      | anything_else => parse_key tree
-      };
-    /* maybe this should be fold right? */
-    List.iter
-      (
-        fun x => (
-          switch !next_function {
-          | Some f => f
-          | None => start_with_angle
-          }
-        ) x
-      )
-      trees;
-    !output
   };
   let rec remove_spaces trees => {
     let output = ref [];
@@ -271,7 +246,7 @@ let parse stream => {
     };
   let rec simplify_single_parentheses tree =>
     switch tree {
-    | Call_list trees when List.length trees == 1 => simplify_single_parentheses (List.nth trees 0)
+    | Call_list trees when List.length trees == 1 => simplify_single_parentheses (List.hd trees)
     | Call_list trees =>
       let trees = List.map simplify_single_parentheses trees;
       Call_list (List.rev trees)
@@ -344,13 +319,12 @@ let parse stream => {
   /* doubly linked lists this would be trivial */
   let state = add_parentheses ();
   let state = remove_spaces state;
+  let state = add_angle_parentheses (Stream.of_list state);
   let state = add_sequences (Stream.of_list state);
   let state = Sequence_list state;
   let state = reverse_everything state;
-  let state = List.nth (add_structs [state]) 0;
+  let state = add_structs state;
   let state = simplify_single_parentheses state;
-  /* incase we added any dumb things... */
-  /* let state = simplify_single_parentheses state; */
   let state = reverse_everything state;
   let state = add_lambdas state;
   let state = add_dot_syntax state;
