@@ -26,7 +26,9 @@ type abstract_tree 'a =
   /* used for sequence => { ... ; ... } */
   | Sequence_list of (list (abstract_tree 'a))
   /* used for lambdas => { x y : ... ; ... } */
-  | Lambda_list of (list (abstract_tree 'a)) (list (abstract_tree 'a));
+  | Lambda_list of (list (abstract_tree 'a)) (list (abstract_tree 'a))
+  /* used for struct literals => {1: 2, 3: 4} */
+  | Struct_list of (list (abstract_tree 'a));
 
 let add_to o x => o := [x, ...!o];
 
@@ -51,6 +53,10 @@ let rec string_of_abstract_tree tree => {
     add_char '(';
     List.iter (fun x => add_string (string_of_abstract_tree x)) list_of_trees;
     add_char ')'
+  | Struct_list struct_map =>
+    add_char '<';
+    List.iter (fun value => add_string (string_of_abstract_tree value)) struct_map;
+    add_char '>';
   | Sequence_list list_of_trees =>
     add_string "{ ";
     List.iter
@@ -104,6 +110,7 @@ let rec add_dot_syntax ast => {
     let list = add_dot_calls list;
     Call_list (List.map add_dot_syntax list)
   | Sequence_list list => Sequence_list (List.map add_dot_syntax list)
+  | Struct_list list => Struct_list (List.map add_dot_syntax list)
   | Lambda_list args body =>
     Lambda_list (List.map add_dot_syntax args) (List.map add_dot_syntax body)
   }
@@ -136,7 +143,8 @@ let parse stream => {
              Stream.iter (
                  fun tree => switch tree {
                      | Symbol (Silver_token.Left_angle, position) =>
-                     add_to output (Call_list [Symbol (Silver_token.Identifier "syntax_angle_bracket", position), ...add_angle_parentheses stream])
+                        let tokens = add_angle_parentheses stream;
+                         add_to output (Struct_list tokens);
                      | Symbol (Silver_token.Right_angle, _) =>
                          raise Stop_iteration
                      | Symbol _ => add_to output tree
@@ -145,7 +153,7 @@ let parse stream => {
                      | Sequence_list trees =>
                         add_to output (Sequence_list (add_angle_parentheses (Stream.of_list trees)))
                      | _ =>
-                       raise (Silver_utils.empty_silver_bug "there shouldn't be lambdas at this stage")
+                       raise (Silver_utils.empty_silver_bug "there shouldn't be lambdas or structs at this stage")
                  }
              )
              stream;
@@ -179,6 +187,9 @@ let parse stream => {
             | Symbol data => add_to outgoing_item (Symbol data)
             | Call_list trees =>
               add_to outgoing_item (Call_list (add_sequences (Stream.of_list trees)))
+            | Struct_list trees =>
+            let with_sequences = List.map (fun x => add_sequences (Stream.of_list [x])) trees;
+                add_to outgoing_item (Struct_list (List.concat with_sequences));
             | Sequence_list _ =>
               raise (Silver_utils.empty_silver_bug "there shouldn't be sequences at this stage")
             | Lambda_list _ _ =>
@@ -194,19 +205,21 @@ let parse stream => {
     next_item ();
     !output
   };
-  let rec add_structs tree => {
-      let remove token => List.filter (fun x => switch x {
-          | Symbol (this_token, position) => this_token != token
-          | _ => false
+      let remove_top_token token => List.filter (fun x => switch x {
+          | Symbol (this_token, position) =>
+          this_token != token
+          | _ =>
+           true
       });
+  let rec remove_punctuation_from_structs tree => {
       switch tree {
           | Symbol _ => tree
-          | Call_list [(Symbol (Silver_token.Identifier "syntax_angle_bracket", position)), ...rest] =>
-              let rest = remove Silver_token.Colon rest;
-              let rest = remove Silver_token.Comma rest;
-              Call_list [(Symbol (Silver_token.Identifier "struct", position)), ...rest]
-          | Call_list list => Call_list (List.map add_structs list);
-          | Sequence_list list => Sequence_list (List.map add_structs list);
+          | Struct_list rest =>
+              let rest = remove_top_token Silver_token.Colon rest;
+              let rest = remove_top_token Silver_token.Comma rest;
+              Struct_list rest
+          | Call_list list => Call_list (List.map remove_punctuation_from_structs list);
+          | Sequence_list list => Sequence_list (List.map remove_punctuation_from_structs list);
           | _ =>
             raise (
               Silver_utils.Silver_bug
@@ -223,6 +236,7 @@ let parse stream => {
           | Symbol (Silver_token.Space, _) => ()
           | Symbol data => add_to output (Symbol data)
           | Call_list trees => add_to output (Call_list (remove_spaces trees))
+          | Struct_list trees => add_to output (Struct_list (remove_spaces trees))
           | Sequence_list trees => add_to output (Sequence_list (remove_spaces trees))
           | Lambda_list _ _ =>
             raise (
@@ -239,6 +253,9 @@ let parse stream => {
     | Call_list trees =>
       let trees = List.map reverse_everything trees;
       Call_list (List.rev trees)
+    | Struct_list trees =>
+      let trees = List.map reverse_everything trees;
+      Struct_list (List.rev trees)
     | Sequence_list trees =>
       let trees = List.map reverse_everything trees;
       Sequence_list (List.rev trees)
@@ -250,6 +267,9 @@ let parse stream => {
     | Call_list trees =>
       let trees = List.map simplify_single_parentheses trees;
       Call_list (List.rev trees)
+    | Struct_list trees  =>
+      let trees = List.map simplify_single_parentheses trees;
+      Struct_list (trees)
     | Sequence_list trees =>
       let trees = List.map simplify_single_parentheses trees;
       Sequence_list (List.rev trees)
@@ -295,6 +315,9 @@ let parse stream => {
     | Call_list trees =>
       let trees = List.map add_lambdas trees;
       Call_list trees
+    | Struct_list trees =>
+        let trees = List.map add_lambdas trees;
+        Struct_list trees
     | Lambda_list first_trees second_trees =>
       raise (
         Silver_utils.Silver_bug
@@ -322,8 +345,11 @@ let parse stream => {
   let state = add_angle_parentheses (Stream.of_list state);
   let state = add_sequences (Stream.of_list state);
   let state = Sequence_list state;
+  let state = simplify_single_parentheses state;
+  /*
   let state = reverse_everything state;
-  let state = add_structs state;
+  */
+  let state = remove_punctuation_from_structs state;
   let state = simplify_single_parentheses state;
   let state = reverse_everything state;
   let state = add_lambdas state;

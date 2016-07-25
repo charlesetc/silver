@@ -136,9 +136,9 @@ let test_basic_parsing () => {
   assert_parsed
     "{ hi: there } { hi: there }" "{({lambda :hi of :there;} {lambda :hi of :there;});}";
   assert_parsed "{ hi: there }\n{ hi: there }" "{{lambda :hi of :there;};{lambda :hi of :there;};}";
-  assert_parsed "<color:blue, shadow:red>" "{(:struct:color:blue:shadow:red);}";
-  assert_parsed "<color:blue,,>" "{(:struct:color:blue);}";
-  assert_parsed "<color: blue,\nshadow:red>" "{(:struct:color:blue:shadow:red);}";
+  assert_parsed "<color:blue, shadow:red>" "{<:color:blue:shadow:red>;}";
+  assert_parsed "<color:blue,,>" "{<:color:blue>;}";
+  assert_parsed "<color: blue,\nshadow:red>" "{<:color:blue:shadow:red>;}";
 
   /* section for  */
   assert_parsed "hi.there" "{(.there:hi);}";
