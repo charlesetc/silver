@@ -139,6 +139,7 @@ let test_basic_parsing () => {
   assert_parsed "<color:blue, shadow:red>" "{<:color:blue:shadow:red>;}";
   assert_parsed "<color:blue,,>" "{<:color:blue>;}";
   assert_parsed "<color: blue,\nshadow:red>" "{<:color:blue:shadow:red>;}";
+  assert_parsed "<color: <size: 2>, news: fine>" "{<:color <:size :2> :news :fine>;}";
 
   /* section for  */
   assert_parsed "hi.there" "{(.there:hi);}";

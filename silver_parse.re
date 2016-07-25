@@ -217,7 +217,7 @@ let parse stream => {
           | Struct_list rest =>
               let rest = remove_top_token Silver_token.Colon rest;
               let rest = remove_top_token Silver_token.Comma rest;
-              Struct_list rest
+              Struct_list (List.map remove_punctuation_from_structs rest)
           | Call_list list => Call_list (List.map remove_punctuation_from_structs list);
           | Sequence_list list => Sequence_list (List.map remove_punctuation_from_structs list);
           | _ =>
